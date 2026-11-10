@@ -1,0 +1,12 @@
+{
+  "name": "Internet's Dream",
+  "short_name": "Dream",
+  "description": "Private, locally-encrypted personal second brain",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#fef7ff",
+  "theme_color": "#6750a4",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

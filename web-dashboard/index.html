@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Internet's Dream — Universal Contextual Memory</title>
+<meta name="description" content="A private, locally-encrypted AI indexer for your digital life.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="appbar">
+  <div class="appbar-inner">
+    <a class="brand" href="#/dashboard">
+      <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+        <path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8Zm-1-13h2v6h-2Zm0 8h2v2h-2Z"/>
+      </svg>
+      <span>Internet's Dream</span>
+    </a>
+    <nav class="appbar-nav">
+      <span id="mode-badge" class="chip">demo mode</span>
+      <button id="theme-toggle" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.39 5.39 0 0 1-4.4 2.26 5.4 5.4 0 0 1-5.4-5.4c0-1.81.89-3.42 2.26-4.4A9.06 9.06 0 0 0 12 3Z"/></svg>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="rail" aria-label="Primary">
+    <a href="#/dashboard" data-route="dashboard" class="rail-item">
+      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 5h16v4H4Zm0 6h16v4H4Zm0 6h16v2H4Z"/></svg>
+      <span>Dashboard</span>
+    </a>
+    <a href="#/search" data-route="search" class="rail-item">
+      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5Zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14Z"/></svg>
+      <span>Search</span>
+    </a>
+    <a href="#/ask" data-route="ask" class="rail-item">
+      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 15h-2v-2h2Zm1.07-7.75-.9.92A2.5 2.5 0 0 0 13 12h-2v-.5a4 4 0 0 1 .9-2.4l1.2-1.21A1.5 1.5 0 1 0 10.5 7H8.5a3.5 3.5 0 1 1 5.57 2.25Z"/></svg>
+      <span>Ask</span>
+    </a>
+    <a href="#/graph" data-route="graph" class="rail-item">
+      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 2 9.2 8.6 2 9.3l5.5 4.7L5.8 21 12 17.3 18.2 21l-1.7-7 5.5-4.7-7.2-.7Z"/></svg>
+      <span>Graph</span>
+    </a>
+    <a href="#/settings" data-route="settings" class="rail-item">
+      <svg viewBox="0 0 24 24"><path fill="currentColor" d="M19.14 12.94a7.07 7.07 0 0 0 0-1.88l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.05 7.05 0 0 0-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.48.41l-.36 2.54a7.05 7.05 0 0 0-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.12-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58ZM12 15.6A3.6 3.6 0 1 1 15.6 12 3.6 3.6 0 0 1 12 15.6Z"/></svg>
+      <span>Settings</span>
+    </a>
+  </nav>
+
+  <main id="view" class="view" tabindex="-1"></main>
+</div>
+
+<script src="demo-data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

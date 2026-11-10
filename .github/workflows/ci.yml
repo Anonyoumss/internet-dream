@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  core-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dreamcore
+        run: pip install -e core pytest
+      - name: Run tests
+        run: python -m pytest tests -q
+      - name: Byte-compile all python
+        run: python -m compileall -q core agents desktop-linux tests
+      - name: Syntax-check dashboard JS
+        run: node --check web-dashboard/app.js && node --check web-dashboard/demo-data.js
+
+  orchestrator-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python agents/orchestrator.py --plan-only

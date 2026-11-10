@@ -1,0 +1,31 @@
+name: Linux package
+
+on:
+  push:
+    branches: [main]
+    paths: ["desktop-linux/**", "core/**", ".github/workflows/linux.yml"]
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test PyQt6 client compiles
+        run: |
+          pip install PyQt6 -q
+          python -m py_compile desktop-linux/dream_desktop.py
+      - name: Bundle tarball
+        run: |
+          mkdir -p dist/internet-dream-linux
+          cp -r desktop-linux/* dist/internet-dream-linux/
+          cp -r core dist/internet-dream-linux/core
+          tar -czf dist/internet-dream-linux-x86_64.tar.gz -C dist internet-dream-linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: internet-dream-linux-tarball
+          path: dist/internet-dream-linux-x86_64.tar.gz
+          retention-days: 30
