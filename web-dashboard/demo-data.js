@@ -1,6 +1,19 @@
 /* Demo dataset — realistic sample memories so the dashboard works fully
    offline on GitHub Pages (demo mode). Live mode fetches from dreamcore. */
 
+window.DEMO_SOURCES = [
+  { id: "gmail", label: "Gmail", description: "Email messages (readonly scope)",
+    requires_google_auth: true, options: { query: "in:inbox OR in:sent", max_results: 500 } },
+  { id: "calendar", label: "Google Calendar", description: "Events ±365 days (readonly scope)",
+    requires_google_auth: true, options: { calendar_id: "primary", past_days: 365, future_days: 365, max_results: 2500 } },
+  { id: "photos", label: "Google Photos", description: "Photo metadata via Picker API (no image download)",
+    requires_google_auth: true, options: { max_items: 10000 } },
+  { id: "browser", label: "Browser history", description: "Chrome/Chromium + Firefox visited pages",
+    requires_google_auth: false, options: { which: null, max_results: 20000 } },
+  { id: "files", label: "Local files", description: "Text-readable files in a directory (chunked)",
+    requires_google_auth: false, options: { path: ".", max_files: 5000 } }
+];
+
 window.DEMO = {
   stats: { total: 1284, bySource: { whatsapp: 742, discord: 431, gmail: 111 }, lastIngest: "2026-11-10T22:14:00Z" },
   memories: [

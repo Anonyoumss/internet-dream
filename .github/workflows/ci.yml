@@ -20,7 +20,9 @@ jobs:
       - name: Byte-compile all python
         run: python -m compileall -q core agents desktop-linux tests
       - name: Syntax-check dashboard JS
-        run: node --check web-dashboard/app.js && node --check web-dashboard/demo-data.js
+        run: |
+          node --check web-dashboard/app.js && node --check web-dashboard/demo-data.js
+          node --check extension/background.js && node --check extension/popup.js && node --check extension/content.js
 
   orchestrator-smoke:
     runs-on: ubuntu-latest

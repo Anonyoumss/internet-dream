@@ -205,6 +205,63 @@
     $("#question").addEventListener("keydown", (e) => e.key === "Enter" && run());
   }
 
+  function renderSources() {
+    view.innerHTML = `
+      <h1>Sources</h1>
+      <p class="sub">Connect your apps. Google sources need a one-time <code>dream auth</code>; browser history and local files need nothing.</p>
+      <div id="source-list"><p class="sub">Loading…</p></div>`;
+    loadSources();
+  }
+
+  async function loadSources() {
+    const el = $("#source-list");
+    let sources;
+    if (state.live) {
+      try { sources = await api("/sources"); }
+      catch { sources = window.DEMO_SOURCES; }
+    } else {
+      sources = window.DEMO_SOURCES;
+    }
+    el.innerHTML = sources.map((s) => `
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div>
+            <h3 style="margin-bottom:4px">${esc(s.label)}</h3>
+            <p class="sub" style="margin:0">${esc(s.description)}
+              ${s.requires_google_auth ? ' <span class="chip">google auth</span>' : ' <span class="chip">local</span>'}</p>
+          </div>
+          <button class="btn ${state.live ? "" : "outlined"}" data-sync="${esc(s.id)}" ${state.live ? "" : "disabled"}>Sync</button>
+        </div>
+        <div class="field" style="margin-top:12px;margin-bottom:0">
+          <label>options (JSON)</label>
+          <input class="src-opts" data-src="${esc(s.id)}" value='${esc(JSON.stringify(s.options || {}))}'>
+        </div>
+        <div class="src-result" data-result="${esc(s.id)}" style="font-size:13px;color:var(--md-sys-color-on-surface-variant);margin-top:8px"></div>
+      </div>`).join("");
+
+    el.querySelectorAll("[data-sync]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.sync;
+        const optsInput = el.querySelector(`.src-opts[data-src="${id}"]`);
+        const out = el.querySelector(`[data-result="${id}"]`);
+        let options = {};
+        try { options = JSON.parse(optsInput.value || "{}"); }
+        catch { out.textContent = "invalid JSON options"; return; }
+        btn.disabled = true;
+        out.textContent = "syncing…";
+        try {
+          const r = await api("/sync", { method: "POST",
+            body: JSON.stringify({ source: id, options }) });
+          out.textContent = `✓ synced ${r.synced} documents`;
+          detectLive();
+        } catch (e) {
+          out.textContent = `sync failed: ${e.message} — is dream serve running with this source configured?`;
+        }
+        btn.disabled = false;
+      });
+    });
+  }
+
   function renderGraph() {
     view.innerHTML = `
       <h1>Memory graph</h1>
@@ -336,7 +393,7 @@ dream config --provider openai-compatible \\
   }
 
   // ---------- router ----------
-  const routes = { dashboard: renderDashboard, search: renderSearch, ask: renderAsk, graph: renderGraph, settings: renderSettings };
+  const routes = { dashboard: renderDashboard, search: renderSearch, ask: renderAsk, sources: renderSources, graph: renderGraph, settings: renderSettings };
   function route() {
     const name = (location.hash.replace("#/", "") || "dashboard").split("?")[0];
     document.querySelectorAll(".rail-item").forEach((a) =>

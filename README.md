@@ -69,9 +69,9 @@ GitHub Pages site works with zero backend. Live mode connects to `dreamcore serv
 |---|---|---|
 | ![Dashboard](assets/screenshots/web-dashboard.png) | ![Search](assets/screenshots/web-search.png) | ![Ask](assets/screenshots/web-ask.png) |
 
-| Memory graph | Settings | Phone viewport |
+| Memory graph | Sources | Settings |
 |---|---|---|
-| ![Graph](assets/screenshots/web-graph.png) | ![Settings](assets/screenshots/web-settings.png) | ![Phone](assets/screenshots/web-phone.png) |
+| ![Graph](assets/screenshots/web-graph.png) | ![Sources](assets/screenshots/web-sources.png) | ![Settings](assets/screenshots/web-settings.png) |
 
 ## Features (what actually exists today)
 
@@ -127,9 +127,23 @@ into a grounded prompt, and streams back a cited answer.
 | macOS | `Internet's Dream.dmg` (unsigned) | [Actions → macOS DMG](https://github.com/Anonyoumss/internet-dream/actions/workflows/macos.yml) |
 | Android | `app-debug.apk` | [Actions → Android APK](https://github.com/Anonyoumss/internet-dream/actions/workflows/android.yml) |
 | Linux | `internet-dream-linux-x86_64.tar.gz` | [Actions → Linux package](https://github.com/Anonyoumss/internet-dream/actions/workflows/linux.yml) |
+| Browser ext. | `internet-dream-extension.zip` (MV3) | [Actions → Browser extension](https://github.com/Anonyoumss/internet-dream/actions/workflows/extension.yml) |
 
 Unsigned macOS builds trigger Gatekeeper — right-click → Open on first launch.
 Android debug APKs install via `adb install` or direct transfer.
+
+## Browser extension
+
+An MV3 extension (`extension/`) turns any page into a memory:
+
+- **Save this page** — title, URL, and optional selection → `/ingest-text`
+- **Right-click → Save page / Save selection** — context-menu capture
+- **Popup search** — query your memory without leaving the tab
+- API base is configurable in the popup (default `http://127.0.0.1:8765`)
+
+Install: download the zip from Actions, unzip, then
+`chrome://extensions` → Developer mode → *Load unpacked*. Works in
+Firefox via `about:debugging` → *Load Temporary Add-on*.
 
 ## Quickstart
 
@@ -204,6 +218,7 @@ offline hashing embedder; point `embed.base_url` at any OpenAI-compatible
 - **Core**: Python 3.10+, SQLite + FTS5, AES-256-GCM (`cryptography`),
   FastAPI, httpx, provider-agnostic LLM gateway.
 - **Web**: vanilla JS + self-contained Material 3 CSS, canvas graph, PWA.
+- **Browser ext.**: Manifest V3, service worker, context menus, popup.
 - **macOS**: SwiftUI, Liquid Glass (`glassEffect` on macOS 26+, material
   fallback), unsigned DMG via `hdiutil`.
 - **Android**: Kotlin, Jetpack Compose, Material 3.
@@ -217,6 +232,7 @@ web-dashboard/      static Material 3 dashboard → GitHub Pages
 desktop-mac/        SwiftUI Liquid Glass client
 desktop-linux/      PyQt6 client
 mobile-android/     Compose Material 3 app
+extension/          MV3 browser extension (save page/selection/search)
 agents/             planner/coder/reviewer orchestrator
 tests/              pytest suite
 scripts/            build-mac-dmg.sh
