@@ -127,6 +127,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DreamApp(vm: DreamViewModel = viewModel()) {
     var tab by remember { mutableIntStateOf(0) }
