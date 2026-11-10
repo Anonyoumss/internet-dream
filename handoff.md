@@ -6,26 +6,41 @@
 - Repo scaffolded: core/, web-dashboard/, desktop-linux/, desktop-mac/,
   mobile-android/, agents/, tests/, scripts/, docs/, assets/screenshots/.
 - goal.md, design.md, handoff.md, UNLICENSE created. No license file.
-- GitHub repo target: Anonyoumss/internet-dream (public, Pages via Actions).
+- GitHub repo: github.com/Anonyoumss/internet-dream (public).
 
-### Phase 2 — Core Engine & Ingestion (in progress)
-- [ ] Encrypted store + FTS5 index
-- [ ] WhatsApp + DiscordChatExporter parsers
-- [ ] LLM gateway (OpenAI-compat + Anthropic + Ollama)
-- [ ] FastAPI app + CLI
+### Phase 2 — Core Engine & Ingestion (done)
+- dreamcore.store: SQLite + AES-256-GCM payloads + FTS5 + vector blobs,
+  hybrid RRF search, thread-safe for FastAPI threadpool.
+- Ingest: WhatsApp _chat.txt (multi-locale, continuations, system-msg
+  filter) + DiscordChatExporter JSON.
+- Embed: offline hashing embedder (default) + OpenAI-compatible API embedder.
+- LLM gateway: OpenAI-compatible + Anthropic; config at
+  ~/.internet-dream/config.json.
+- FastAPI app + `dream` CLI. Verified end-to-end locally:
+  ingest 7 docs → search/ask/graph/stats all return data.
 
-### Phase 3 — Cross-Platform UIs (pending)
-- [ ] Web dashboard (Material 3)
-- [ ] PyQt6 Linux client
-- [ ] SwiftUI Liquid Glass macOS client + dmg script
-- [ ] Compose Material 3 Android app
+### Phase 3 — Cross-Platform UIs (done)
+- web-dashboard: Material 3 SPA, demo mode + live mode, PWA manifest.
+- desktop-linux: PyQt6 client + run.sh + requirements.
+- desktop-mac: SwiftUI Liquid Glass (macOS 26 glassEffect, material
+  fallback) + scripts/build-mac-dmg.sh.
+- mobile-android: Compose Material 3 app, 4 tabs, LAN/emulator API config.
 
-### Phase 4 — Tests, Screenshots, Docs, Ship (pending)
-- [ ] pytest green locally + CI
-- [ ] Screenshots → assets/screenshots/
-- [ ] README (Focus-Plan style)
-- [ ] Push, enable Pages, verify live URL
+### Phase 4 — Tests, Screenshots, Docs, Ship (done)
+- pytest: 8/8 pass locally and in CI.
+- Screenshots: web-{dashboard,search,ask,graph,settings,phone}.png in
+  assets/screenshots/ (headless Chrome, demo mode).
+- README in Focus-Plan style; UNLICENSE; no LICENSE file.
+- Pushed; all workflows green:
+  CI ✅ · Pages ✅ (live at anonyoumss.github.io/internet-dream) ·
+  Android APK ✅ (15MB artifact) · macOS DMG ✅ (verified valid UDZO) ·
+  Linux tarball ✅.
+- Fixes applied in CI: AndroidX gradle.properties, SwiftUI .onAppear
+  placement, ExperimentalMaterial3Api opt-in.
 
-## Environment notes
-- Python 3.14, Node 24, qmake/cmake present. No PyQt6/Android SDK locally —
-  native builds happen in GitHub Actions.
+## Known gaps / next actions
+- Gmail/Calendar/Photos adapters not yet implemented (roadmap).
+- Native clients are thin shells over `dream serve`; not device-tested.
+- macOS DMG unsigned (ad-hoc) — Gatekeeper warning expected.
+- Android artifact is debug-signed only.
+- Orchestrator is a guarded scaffold; extend ALLOW list carefully.
