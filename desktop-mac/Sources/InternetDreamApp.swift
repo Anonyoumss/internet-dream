@@ -274,6 +274,6 @@ struct SettingsView: View {
                     .textSelection(.enabled)
             }
         }
+        .onAppear { base = store.apiBase }
     }
-    .onAppear { base = store.apiBase }
 }
