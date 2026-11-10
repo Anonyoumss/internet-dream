@@ -133,6 +133,48 @@ def cmd_config(args):
     print(json.dumps(safe, indent=2))
 
 
+def cmd_sources(args):
+    from .sources.sync import list_sources
+    for s in list_sources():
+        flag = " [google auth]" if s["requires_google_auth"] else ""
+        print(f"{s['id']:10} {s['label']}{flag}\n           {s['description']}")
+        opts = ", ".join(f"{k}={v!r}" for k, v in s["options"].items())
+        print(f"           options: {opts}")
+
+
+def cmd_auth(args):
+    from .sources import google_auth
+    creds = google_auth.credentials()
+    print(f"Authorized. Token stored at {google_auth.token_path()} "
+          f"(scopes: {', '.join(s.rsplit('/',1)[-1] for s in google_auth.SCOPES)})")
+
+
+def cmd_sync(args):
+    from .sources.sync import sync_source
+    from .embed import EmbedderConfig, get_embedder
+    store = _store(args)
+    cfg = LLMConfig.load()
+    emb = get_embedder(EmbedderConfig(
+        base_url=cfg.embed_base_url, api_key=cfg.embed_api_key,
+        model=cfg.embed_model) if cfg.embed_base_url else None)
+    opts = {}
+    for kv in args.opt or []:
+        if "=" in kv:
+            k, v = kv.split("=", 1)
+            try:
+                v = int(v)
+            except ValueError:
+                try:
+                    v = float(v)
+                except ValueError:
+                    pass
+            opts[k] = v
+    n = sync_source(store, emb, args.source, opts,
+                    progress=lambda c: print(f"\r  {c} docs…", end="", flush=True))
+    print(f"\n{args.source}: synced {n} documents")
+    store.close()
+
+
 def cmd_serve(args):
     import uvicorn
     uvicorn.run(create_app(db_path=args.db, passphrase=args.passphrase),
@@ -171,6 +213,15 @@ def main(argv=None):
     p.add_argument("--api-key"); p.add_argument("--model")
     p.add_argument("--embed-base-url"); p.add_argument("--embed-model")
     p.set_defaults(fn=cmd_config)
+
+    p = sub.add_parser("sources"); p.set_defaults(fn=cmd_sources)
+
+    p = sub.add_parser("auth"); p.set_defaults(fn=cmd_auth)
+
+    p = sub.add_parser("sync")
+    p.add_argument("source", choices=["gmail", "calendar", "photos", "browser", "files"])
+    p.add_argument("--opt", action="append", help="key=value option, repeatable")
+    p.set_defaults(fn=cmd_sync)
 
     p = sub.add_parser("serve")
     p.add_argument("--host", default="127.0.0.1"); p.add_argument("--port", type=int, default=8765)

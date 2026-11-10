@@ -45,6 +45,11 @@ class AskIn(BaseModel):
     question: str
 
 
+class SyncIn(BaseModel):
+    source: str
+    options: dict | None = None
+
+
 class ConfigIn(BaseModel):
     provider: str | None = None
     base_url: str | None = None
@@ -135,6 +140,28 @@ def create_app(db_path: str | os.PathLike | None = None,
             return {"answer": answer, "sources": [h.__dict__ for h in hits],
                     "llm_error": str(e)}
         return {"answer": answer, "sources": [h.__dict__ for h in hits]}
+
+    @app.get("/sources")
+    def sources():
+        from .sources.sync import list_sources
+        return list_sources()
+
+    @app.post("/sync")
+    def sync(body: SyncIn):
+        from .embed import EmbedderConfig, get_embedder
+        from .llm import LLMConfig
+        from .sources.sync import sync_source
+        cfg = LLMConfig.load()
+        emb = get_embedder(EmbedderConfig(
+            base_url=cfg.embed_base_url, api_key=cfg.embed_api_key,
+            model=cfg.embed_model) if cfg.embed_base_url else None)
+        try:
+            n = sync_source(store, emb, body.source, body.options)
+        except KeyError as e:
+            raise HTTPException(400, str(e))
+        except RuntimeError as e:
+            raise HTTPException(400, str(e))
+        return {"source": body.source, "synced": n}
 
     @app.get("/graph")
     def graph():

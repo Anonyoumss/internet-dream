@@ -88,8 +88,17 @@ GitHub Pages site works with zero backend. Live mode connects to `dreamcore serv
   gateway: OpenAI-compatible endpoints (OpenAI, Gemini compat, Ollama,
   llama.cpp) and Anthropic Messages API. Graceful degradation to raw
   matches when no key is configured.
-- **REST API** — `/ingest`, `/ingest-text`, `/search`, `/ask`, `/stats`,
-  `/graph`, `/documents/{id}`, `/config`, `/health`.
+- **Source sync framework** — one pipeline ingests from every connector:
+  - **Gmail** — message metadata + body text (`gmail.readonly`)
+  - **Google Calendar** — events ±365 days (`calendar.readonly`)
+  - **Google Photos** — photo metadata via Picker API, no image download
+  - **Browser history** — Chrome/Chromium + Firefox visited pages (local DB)
+  - **Local files** — text-readable files in any directory, chunked
+  - **Chat exports** — WhatsApp `_chat.txt` + DiscordChatExporter JSON
+  One `dream auth` OAuth flow covers all Google sources; browser/files
+  need no auth at all.
+- **REST API** — `/ingest`, `/ingest-text`, `/sync`, `/sources`, `/search`,
+  `/ask`, `/stats`, `/graph`, `/documents/{id}`, `/config`, `/health`.
 - **Web dashboard** — Material 3 design system (self-contained CSS, dark
   mode, PWA manifest), hash-routed views: Dashboard, Search, Ask, Memory
   graph (canvas), Settings. Demo mode for GitHub Pages.
@@ -145,11 +154,35 @@ and it auto-detects the local backend (set the API base in Settings if needed).
 
 ## Ingesting your data
 
+Chat exports:
+
 - **WhatsApp**: chat → ⋯ → More → Export chat → *Without media* produces
   `_chat.txt`. `dream ingest _chat.txt`.
 - **Discord**: use [Tyrrrz/DiscordChatExporter](https://github.com/tyrrrz/discordchatexporter)
   → export as JSON → `dream ingest channel.json`.
 - **Anything else**: `dream ingest-text --title "..." --text "..."`.
+
+Connected sources (`dream sync <source>`, or `POST /sync`):
+
+```bash
+dream sources                              # list sources + options
+
+# one-time Google setup (Gmail + Calendar + Photos)
+# 1. Google Cloud Console → OAuth client (Desktop app)
+# 2. save it as ~/.internet-dream/client_secret.json
+dream auth                                 # browser consent → token.json
+
+dream sync gmail                           # emails (in:inbox OR in:sent)
+dream sync gmail --opt "query=newer_than:30d" --opt max_results=2000
+dream sync calendar                        # events ±1 year
+dream sync photos                          # photo metadata (no downloads)
+dream sync browser                         # Chrome/Firefox history
+dream sync files --opt path=~/Documents    # index a folder of text files
+```
+
+Google scopes requested: `gmail.readonly`, `calendar.readonly`,
+`photospicker.mediaitems.readonly`. Client secret and token live in
+`~/.internet-dream/` with `0600` permissions.
 
 ## LLM providers
 
@@ -213,8 +246,10 @@ are debug/ad-hoc signed; sign them yourself for distribution.
 
 ## Honest limits
 
-- Gmail/Calendar/Photos adapters are designed-for but not yet implemented —
-  WhatsApp + Discord exports work today.
+- Gmail/Calendar/Photos adapters **are implemented** (OAuth + readonly
+  scopes); they activate once you run `dream auth` with a Google Cloud
+  Desktop OAuth client. Browser-history and local-file sync work today
+  with zero auth.
 - The hashing embedder is keyword-ish; semantic quality improves a lot with
   an embeddings endpoint.
 - Native clients are thin shells over the local API — they need

@@ -38,8 +38,21 @@
 - Fixes applied in CI: AndroidX gradle.properties, SwiftUI .onAppear
   placement, ExperimentalMaterial3Api opt-in.
 
+## Phase 5 — Universal source coverage (done)
+- sources/: google_auth (InstalledAppFlow, token.json 0600), gmail
+  (full-mime parse, html→text fallback), calendar (events ±365d),
+  photos (Picker API sessions, metadata-only), browser (Chrome/Firefox
+  history via temp-copy sqlite), files (text ext walk + chunking).
+- sync.py registry + batched embed/store; CLI: auth/sync/sources;
+  API: GET /sources, POST /sync.
+- pyproject extra `google` for google-api-python-client stack.
+- Tests: 19/19 pass (parser-level, no network). Smoke-tested
+  `dream sync files` + `POST /sync` end-to-end.
+
 ## Known gaps / next actions
-- Gmail/Calendar/Photos adapters not yet implemented (roadmap).
+- Google sources need a user-supplied client_secret.json + `dream auth`
+  (can't be automated — requires their Google account consent).
+- Photos indexes metadata only by design (Picker API, no binary download).
 - Native clients are thin shells over `dream serve`; not device-tested.
 - macOS DMG unsigned (ad-hoc) — Gatekeeper warning expected.
 - Android artifact is debug-signed only.
