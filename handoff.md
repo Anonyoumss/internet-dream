@@ -102,8 +102,16 @@
 - pyproject: +python-multipart.
 - Tests: 36/36 pass. Live-verified: /chat answered stats + Discord
   questions via real tool calls (Gemini 2.5 Flash).
-- Real store at last check: ~43k docs (discord sync still running:
-  browser 13,071 · discord 23,300+ · files 6,969).
+- whatsapp-bridge/ (Baileys): QR-link real account, read-only inbound
+  indexing to /ingest-text, media → ~/.internet-dream/whatsapp-media/.
+  Verified QR generation; needs one user scan to activate.
+- Material 3 Expressive reskin: spring motion, 28-36px radii, gradient
+  surfaces/type, elevated cards — web-dashboard/styles.css rewritten,
+  manifest colors updated. Verified render via headless Chrome.
+- Live agent verified end-to-end: remember/search/sync tools write and
+  read the real store (agent source docs present).
+- Real store: ~63k docs (browser 13,071 · discord 43,100+ and climbing ·
+  files 6,969 · agent 1).
 
 ## Known gaps / next actions
 - Google sources need client_secret.json + one consent (web or CLI).
