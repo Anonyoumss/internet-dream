@@ -127,12 +127,55 @@ def cmd_config(args):
     if args.embed_base_url: cfg.embed_base_url = args.embed_base_url
     if args.embed_model: cfg.embed_model = args.embed_model
     if args.telegram_token: cfg.telegram_bot_token = args.telegram_token
+    if args.tg_api_id is not None: cfg.telegram_api_id = args.tg_api_id
+    if args.tg_api_hash: cfg.telegram_api_hash = args.tg_api_hash
     cfg.save()
     safe = cfg.__dict__.copy()
     safe["api_key"] = "***" if cfg.api_key else None
     safe["embed_api_key"] = "***" if cfg.embed_api_key else None
     safe["telegram_bot_token"] = "***" if cfg.telegram_bot_token else None
+    safe["telegram_api_hash"] = "***" if getattr(cfg, "telegram_api_hash", None) else None
     print(json.dumps(safe, indent=2))
+
+
+def cmd_tg_login(args):
+    import asyncio
+    from . import tg_user
+    if not tg_user.is_logged_in():
+        tg_user.api_credentials()  # validates config exists
+    asyncio.run(_tg_login())
+
+
+async def _tg_login():
+    from telethon import TelegramClient
+    from . import tg_user
+    api_id, api_hash = tg_user.api_credentials()
+    c = TelegramClient(str(tg_user.SESSION), api_id, api_hash)
+    await c.start()  # interactive: phone → code → 2FA
+    me = await c.get_me()
+    print(f"logged in as @{getattr(me, 'username', '?')} "
+          f"({getattr(me, 'first_name', '')})")
+    await c.disconnect()
+
+
+def cmd_tg_sync(args):
+    import asyncio
+    from . import tg_user
+    store = _store(args)
+    emb = get_embedder()
+    n = asyncio.run(tg_user.sync_account(
+        store, emb, max_per_dialog=args.max_per_dialog,
+        max_dialogs=args.max_dialogs))
+    print(f"telegram-account: synced {n} messages")
+    store.close()
+
+
+def cmd_tg_bot(args):
+    import asyncio
+    from . import tg_user
+    store = _store(args)
+    emb = get_embedder()
+    asyncio.run(tg_user.userbot_loop(store, emb, watch_chat=args.chat))
 
 
 def cmd_telegram_bot(args):
@@ -220,11 +263,25 @@ def main(argv=None):
     p.add_argument("--api-key"); p.add_argument("--model")
     p.add_argument("--embed-base-url"); p.add_argument("--embed-model")
     p.add_argument("--telegram-token", help="Telegram bot token from @BotFather")
+    p.add_argument("--tg-api-id", type=int, help="Telegram api_id (my.telegram.org)")
+    p.add_argument("--tg-api-hash", help="Telegram api_hash")
     p.set_defaults(fn=cmd_config)
 
     p = sub.add_parser("telegram-bot", help="run the Telegram bot bridge")
     p.add_argument("--poll-timeout", type=int, default=30)
     p.set_defaults(fn=cmd_telegram_bot)
+
+    p = sub.add_parser("tg-login", help="log in to Telegram as your account (Telethon)")
+    p.set_defaults(fn=cmd_tg_login)
+
+    p = sub.add_parser("tg-sync", help="sync your Telegram account history")
+    p.add_argument("--max-per-dialog", type=int, default=200)
+    p.add_argument("--max-dialogs", type=int, default=200)
+    p.set_defaults(fn=cmd_tg_sync)
+
+    p = sub.add_parser("tg-bot", help="userbot assistant (Saved Messages commands)")
+    p.add_argument("--chat", help="watch a specific chat/entity instead of Saved Messages")
+    p.set_defaults(fn=cmd_tg_bot)
 
     p = sub.add_parser("sources"); p.set_defaults(fn=cmd_sources)
 

@@ -231,11 +231,30 @@ YouTube doesn't expose watch history via API — export it:
    — or pass a list via the API/dashboard: `{"paths": [".../watch-history.html", ".../search-history.html"]}`.
    JSON activity exports work too (`path=file.json`).
 
-### Telegram
+### Telegram — bot *or* your real account
+
+**Bot mode** (sees only chats it's in):
 
 1. Message [@BotFather](https://t.me/BotFather) → `/newbot` → copy the token.
 2. `dream config --telegram-token 123456:ABC...`
-3. `dream telegram-bot` — the bot then supports:
+3. `dream telegram-bot` — commands below.
+
+**Userbot mode** (Telethon — logs in as *you*, full account access):
+
+1. Get `api_id` + `api_hash` at [my.telegram.org](https://my.telegram.org)
+   → *API development tools*.
+2. `dream config --tg-api-id 12345 --tg-api-hash abcdef`
+3. `pip install -e 'core[telegram]'`
+4. `dream tg-login` — phone → code → 2FA (session saved to
+   `~/.internet-dream/telegram_user.session`)
+5. `dream tg-sync` — index recent messages from **every dialog**
+6. `dream tg-bot` — assistant in **Saved Messages**: same commands as the
+   bot (`/ask /search /stats /remember /export /sync`), files you send
+   there are downloaded to `~/.internet-dream/inbox/` and indexed, and
+   `/export` sends memories back as files. `--chat <name>` watches a
+   specific chat instead.
+
+Bot commands (`dream telegram-bot`):
 
    | Command | Does |
    |---|---|
@@ -249,6 +268,7 @@ YouTube doesn't expose watch history via API — export it:
    | *(send a document/photo)* | downloaded to `~/.internet-dream/inbox/` and indexed if text-readable |
 
    `dream sync telegram` also dumps recent `getUpdates` into the store.
+   For full-account access use the Telethon userbot commands above.
 
 ## LLM providers
 

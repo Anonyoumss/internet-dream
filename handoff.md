@@ -65,10 +65,20 @@
 - CLI: `dream config --telegram-token`, `dream telegram-bot`.
 - Tests: 27/27 pass.
 
+## Phase 7 — Telegram userbot (Telethon, real account) (done)
+- tg_user.py: Telethon client (session ~/.internet-dream/telegram_user.
+  session), api_id/api_hash via config/env, message_to_document mapper,
+  iter_account_messages + sync_account (async, batched), userbot_loop —
+  Saved Messages (or --chat) command bridge reusing telegram_bot.
+  handle_update; file download→index; /export sends .md via send_file.
+- CLI: tg-login (interactive phone/code/2FA), tg-sync, tg-bot --chat.
+- config.json: telegram_api_id/hash fields; pyproject [telegram] extra.
+- Tests: 31/31 pass.
+
 ## Known gaps / next actions
 - Google sources need client_secret.json + one consent (web or CLI).
-- Telegram bot only sees messages sent to it / groups it's in — full
-  account read would need Telethon (userbot) — possible future add.
+- Telegram userbot needs api_id/api_hash + interactive login (can't
+  automate the SMS/code step); bot mode covers token-only setups.
 - YouTube needs a Takeout export (no API for watch history).
 - Photos indexes metadata only by design (Picker API, no binary download).
 - Photos indexes metadata only by design (Picker API, no binary download).

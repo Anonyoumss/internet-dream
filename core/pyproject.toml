@@ -21,6 +21,7 @@ google = [
     "google-auth-httplib2>=0.2",
     "google-auth-oauthlib>=1.2",
 ]
+telegram = ["telethon>=1.36"]
 android-export = []
 
 [project.scripts]

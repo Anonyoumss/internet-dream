@@ -40,6 +40,8 @@ class LLMConfig:
     embed_api_key: str | None = None
     embed_model: str = "text-embedding-3-small"
     telegram_bot_token: str | None = None
+    telegram_api_id: int | None = None
+    telegram_api_hash: str | None = None
 
     @classmethod
     def load(cls, path: str | Path | None = None) -> "LLMConfig":
@@ -58,6 +60,8 @@ class LLMConfig:
             embed_api_key=embed.get("api_key") or data.get("embed_api_key"),
             embed_model=embed.get("model", "text-embedding-3-small"),
             telegram_bot_token=data.get("telegram_bot_token"),
+            telegram_api_id=data.get("telegram_api_id"),
+            telegram_api_hash=data.get("telegram_api_hash"),
         )
 
     def save(self, path: str | Path | None = None) -> None:
@@ -74,6 +78,8 @@ class LLMConfig:
                 "model": self.embed_model,
             },
             "telegram_bot_token": self.telegram_bot_token,
+            "telegram_api_id": self.telegram_api_id,
+            "telegram_api_hash": self.telegram_api_hash,
         }, indent=2))
         os.chmod(p, 0o600)
 
