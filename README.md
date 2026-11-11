@@ -103,12 +103,26 @@ GitHub Pages site works with zero backend. Live mode connects to `dreamcore serv
   OAuth flow covers all Google sources — the token is shared by the
   dashboard, Android app, extension, and Telegram bot. Browser/files/
   Telegram need no Google auth at all.
-- **REST API** — `/ingest`, `/ingest-text`, `/sync`, `/sources`, `/search`,
+- **Discord (live)** — `dream sync discord` exports messages from all your
+  servers via the REST API using a token *you* save to
+  `~/.internet-dream/discord_token.txt` (GET requests only, nothing sent).
+  DiscordChatExporter JSON also works via `dream ingest`.
+- **WhatsApp (live)** — `whatsapp-bridge/` links your real account via QR
+  (Baileys/WhatsApp Web multi-device) and indexes every incoming message —
+  read-only, never sends anything.
+- **REST API** — `/ingest`, `/ingest-upload`, `/ingest-text`, `/chat`
+  (agent with tools), `/sync`, `/sources`, `/search`,
   `/ask`, `/stats`, `/graph`, `/documents/{id}`, `/config`, `/health`,
   `/auth/google/start|callback`, `/auth/status`.
+- **Agent chat** — `POST /chat` runs an LLM tool-calling loop: it can
+  `search_memory`, `remember`, `sync_source`, `get_stats`, `list_sources`.
+  The dashboard **Chat** page is a real conversation with visible tool steps.
+- **Setup wizard** — dashboard `#/setup`: paste API key → connect Google →
+  pick sources → chat. Five steps to a fully indexed second brain.
 - **Web dashboard** — Material 3 design system (self-contained CSS, dark
-  mode, PWA manifest), hash-routed views: Dashboard, Search, Ask, Memory
-  graph (canvas), Settings. Demo mode for GitHub Pages.
+  mode, PWA manifest), hash-routed views: Dashboard, Search, Chat (agent),
+  Setup wizard, Sources (with export upload), Memory graph, Settings.
+  Demo mode for GitHub Pages.
 - **macOS client** — SwiftUI with Liquid Glass materials on macOS 26+
   (ultra-thin-material fallback), packaged as an unsigned `.dmg` by CI.
 - **Android app** — Jetpack Compose + Material 3, debug APK built by CI.
@@ -185,8 +199,15 @@ Chat exports:
 
 - **WhatsApp**: chat → ⋯ → More → Export chat → *Without media* produces
   `_chat.txt`. `dream ingest _chat.txt`.
-- **Discord**: use [Tyrrrz/DiscordChatExporter](https://github.com/tyrrrz/discordchatexporter)
-  → export as JSON → `dream ingest channel.json`.
+- **Discord**: `dream sync discord` (live, read-only — token in
+  `~/.internet-dream/discord_token.txt`), or DiscordChatExporter JSON →
+  `dream ingest channel.json`.
+- **WhatsApp live**: `cd whatsapp-bridge && npm install && ./run.sh` —
+  scan the QR once (WhatsApp → Linked Devices), then every incoming
+  message is indexed automatically. Never sends messages.
+- **WhatsApp exports**: `dream sync whatsapp --opt path=~/Downloads` picks
+  up any `_chat.txt` exports it finds, or upload one on the dashboard
+  Sources page.
 - **Anything else**: `dream ingest-text --title "..." --text "..."`.
 
 Connected sources (`dream sync <source>`, or `POST /sync`):
@@ -205,6 +226,10 @@ dream sync calendar                        # events ±1 year
 dream sync photos                          # photo metadata (no downloads)
 dream sync browser                         # Chrome/Firefox history
 dream sync files --opt path=~/Documents    # index a folder of text files
+dream sync whatsapp --opt path=~/Downloads # WhatsApp _chat.txt exports
+dream sync discord                         # all servers (needs token file)
+dream sync youtube --opt "path=.../watch-history.html"
+dream sync telegram                        # recent bot updates
 ```
 
 Google scopes requested: `gmail.readonly`, `calendar.readonly`,
