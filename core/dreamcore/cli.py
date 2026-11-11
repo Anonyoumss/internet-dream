@@ -126,11 +126,18 @@ def cmd_config(args):
     if args.model: cfg.model = args.model
     if args.embed_base_url: cfg.embed_base_url = args.embed_base_url
     if args.embed_model: cfg.embed_model = args.embed_model
+    if args.telegram_token: cfg.telegram_bot_token = args.telegram_token
     cfg.save()
     safe = cfg.__dict__.copy()
     safe["api_key"] = "***" if cfg.api_key else None
     safe["embed_api_key"] = "***" if cfg.embed_api_key else None
+    safe["telegram_bot_token"] = "***" if cfg.telegram_bot_token else None
     print(json.dumps(safe, indent=2))
+
+
+def cmd_telegram_bot(args):
+    from .telegram_bot import run
+    run(poll_timeout=args.poll_timeout)
 
 
 def cmd_sources(args):
@@ -212,14 +219,20 @@ def main(argv=None):
     p.add_argument("--provider"); p.add_argument("--base-url")
     p.add_argument("--api-key"); p.add_argument("--model")
     p.add_argument("--embed-base-url"); p.add_argument("--embed-model")
+    p.add_argument("--telegram-token", help="Telegram bot token from @BotFather")
     p.set_defaults(fn=cmd_config)
+
+    p = sub.add_parser("telegram-bot", help="run the Telegram bot bridge")
+    p.add_argument("--poll-timeout", type=int, default=30)
+    p.set_defaults(fn=cmd_telegram_bot)
 
     p = sub.add_parser("sources"); p.set_defaults(fn=cmd_sources)
 
     p = sub.add_parser("auth"); p.set_defaults(fn=cmd_auth)
 
     p = sub.add_parser("sync")
-    p.add_argument("source", choices=["gmail", "calendar", "photos", "browser", "files"])
+    from .sources.sync import SOURCES as _SRC
+    p.add_argument("source", choices=sorted(_SRC))
     p.add_argument("--opt", action="append", help="key=value option, repeatable")
     p.set_defaults(fn=cmd_sync)
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Callable, Iterator
 
 from ..store import Document, Store
-from . import browser, calendar, files, gmail, photos
+from . import browser, calendar, drive, files, gmail, photos, telegram, youtube
 
 BATCH = 100
 
@@ -41,6 +41,22 @@ def _browser(opts) -> Iterator[Document]:
 def _files(opts) -> Iterator[Document]:
     yield from files.iter_files(opts.get("path", "."),
                                 max_files=int(opts.get("max_files", 5000)))
+
+
+def _drive(opts) -> Iterator[Document]:
+    yield from drive.iter_files(
+        max_results=int(opts.get("max_results", 5000)),
+        include_text=bool(opts.get("include_text", True)),
+        query=opts.get("query", "trashed=false"))
+
+
+def _youtube(opts) -> Iterator[Document]:
+    yield from youtube.iter_youtube(opts)
+
+
+def _telegram(opts) -> Iterator[Document]:
+    yield from telegram.iter_updates(
+        max_results=int(opts.get("max_results", 1000)))
 
 
 SOURCES: dict[str, dict] = {
@@ -79,6 +95,28 @@ SOURCES: dict[str, dict] = {
         "requires_google_auth": False,
         "factory": _files,
         "options": {"path": ".", "max_files": 5000},
+    },
+    "drive": {
+        "label": "Google Drive",
+        "description": "File metadata + text content (readonly scope)",
+        "requires_google_auth": True,
+        "factory": _drive,
+        "options": {"max_results": 5000, "include_text": True,
+                    "query": "trashed=false"},
+    },
+    "youtube": {
+        "label": "YouTube history",
+        "description": "Watch/search history from Google Takeout export",
+        "requires_google_auth": False,
+        "factory": _youtube,
+        "options": {"path": "~/Downloads/.../watch-history.html"},
+    },
+    "telegram": {
+        "label": "Telegram",
+        "description": "Recent bot-visible messages (needs bot token)",
+        "requires_google_auth": False,
+        "factory": _telegram,
+        "options": {"max_results": 1000},
     },
 }
 

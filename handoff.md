@@ -49,9 +49,28 @@
 - Tests: 19/19 pass (parser-level, no network). Smoke-tested
   `dream sync files` + `POST /sync` end-to-end.
 
+## Phase 6 — Telegram, YouTube, Drive, backend OAuth (done)
+- sources/telegram.py: Bot API getUpdates → Documents; download_file,
+  send_document, send_message helpers.
+- dreamcore/telegram_bot.py: `dream telegram-bot` long-poll bridge —
+  /ask /search /stats /remember /export (sends .md file) /sync, auto-
+  ingests documents/photos to ~/.internet-dream/inbox/.
+- sources/youtube.py: Takeout watch-history.html + JSON activity parser.
+- sources/drive.py: Drive v3 metadata + text-file content indexing.
+- dreamcore/oauth.py + API: GET /auth/google/start|callback|status —
+  backend-managed consent, token shared by all clients; dashboard
+  Settings has "Connect Google account" button.
+- SCOPES extended: +drive.readonly +youtube.readonly; token re-consent
+  on scope change.
+- CLI: `dream config --telegram-token`, `dream telegram-bot`.
+- Tests: 27/27 pass.
+
 ## Known gaps / next actions
-- Google sources need a user-supplied client_secret.json + `dream auth`
-  (can't be automated — requires their Google account consent).
+- Google sources need client_secret.json + one consent (web or CLI).
+- Telegram bot only sees messages sent to it / groups it's in — full
+  account read would need Telethon (userbot) — possible future add.
+- YouTube needs a Takeout export (no API for watch history).
+- Photos indexes metadata only by design (Picker API, no binary download).
 - Photos indexes metadata only by design (Picker API, no binary download).
 - Native clients are thin shells over `dream serve`; not device-tested.
 - macOS DMG unsigned (ad-hoc) — Gatekeeper warning expected.

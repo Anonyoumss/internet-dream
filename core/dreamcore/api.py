@@ -17,7 +17,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from .embed import get_embedder
@@ -162,6 +163,46 @@ def create_app(db_path: str | os.PathLike | None = None,
         except RuntimeError as e:
             raise HTTPException(400, str(e))
         return {"source": body.source, "synced": n}
+
+    # -- Google OAuth (backend-managed; one consent for all clients) ------
+
+    @app.get("/auth/google/start")
+    def google_start(request: Request):
+        from . import oauth
+        try:
+            url = oauth.auth_url(
+                request.url.hostname or "127.0.0.1",
+                request.url.port or 80)
+        except Exception as e:
+            raise HTTPException(400, str(e))
+        return RedirectResponse(url)
+
+    @app.get("/auth/google/callback")
+    def google_callback(request: Request, code: str = "", error: str = ""):
+        from urllib.parse import quote
+        from . import oauth
+        if error:
+            return RedirectResponse(f"/#/sources?google_error={quote(error)}")
+        try:
+            oauth.handle_callback(
+                code,
+                request.url.hostname or "127.0.0.1",
+                request.url.port or 80)
+        except Exception as e:
+            return RedirectResponse(f"/#/sources?google_error={quote(str(e))}")
+        return RedirectResponse("/#/sources?google=connected")
+
+    @app.get("/auth/status")
+    def auth_status():
+        from .sources import google_auth, telegram
+        return {
+            "google": {
+                "client_configured": google_auth.available(),
+                "token_present": google_auth.TOKEN_FILE.exists(),
+                "scopes": google_auth.SCOPES,
+            },
+            "telegram": {"bot_token": bool(telegram.bot_token())},
+        }
 
     @app.get("/graph")
     def graph():

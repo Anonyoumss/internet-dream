@@ -91,14 +91,21 @@ GitHub Pages site works with zero backend. Live mode connects to `dreamcore serv
 - **Source sync framework** — one pipeline ingests from every connector:
   - **Gmail** — message metadata + body text (`gmail.readonly`)
   - **Google Calendar** — events ±365 days (`calendar.readonly`)
+  - **Google Drive** — file metadata + text-file contents (`drive.readonly`)
   - **Google Photos** — photo metadata via Picker API, no image download
+  - **YouTube history** — watch/search history from Google Takeout
+  - **Telegram** — bot-visible messages; interactive bot can read, answer,
+    and send files (`dream telegram-bot`)
   - **Browser history** — Chrome/Chromium + Firefox visited pages (local DB)
   - **Local files** — text-readable files in any directory, chunked
   - **Chat exports** — WhatsApp `_chat.txt` + DiscordChatExporter JSON
-  One `dream auth` OAuth flow covers all Google sources; browser/files
-  need no auth at all.
+  One `dream auth` (CLI) **or** backend `GET /auth/google/start` (web)
+  OAuth flow covers all Google sources — the token is shared by the
+  dashboard, Android app, extension, and Telegram bot. Browser/files/
+  Telegram need no Google auth at all.
 - **REST API** — `/ingest`, `/ingest-text`, `/sync`, `/sources`, `/search`,
-  `/ask`, `/stats`, `/graph`, `/documents/{id}`, `/config`, `/health`.
+  `/ask`, `/stats`, `/graph`, `/documents/{id}`, `/config`, `/health`,
+  `/auth/google/start|callback`, `/auth/status`.
 - **Web dashboard** — Material 3 design system (self-contained CSS, dark
   mode, PWA manifest), hash-routed views: Dashboard, Search, Ask, Memory
   graph (canvas), Settings. Demo mode for GitHub Pages.
@@ -195,8 +202,53 @@ dream sync files --opt path=~/Documents    # index a folder of text files
 ```
 
 Google scopes requested: `gmail.readonly`, `calendar.readonly`,
-`photospicker.mediaitems.readonly`. Client secret and token live in
-`~/.internet-dream/` with `0600` permissions.
+`drive.readonly`, `youtube.readonly`, `photospicker.mediaitems.readonly`.
+Client secret and token live in `~/.internet-dream/` with `0600` permissions.
+
+### Google login — two ways, same token
+
+**Backend web flow (easiest — one consent for everything):**
+
+1. Create a Google Cloud OAuth client. For the web flow use type
+   *Web application* and register the redirect URI
+   `http://127.0.0.1:8765/auth/google/callback` (adjust host/port if your
+   `dream serve` differs). Save it as `~/.internet-dream/client_secret.json`.
+2. `dream serve`, then open `http://127.0.0.1:8765/auth/google/start` — or
+   click **Connect Google account** in the dashboard Settings.
+3. Done — the token at `~/.internet-dream/token.json` is shared by the
+   dashboard, Android app, browser extension, and Telegram bot.
+
+**CLI flow:** `dream auth` (installed-app loopback consent).
+
+### YouTube history (Google Takeout)
+
+YouTube doesn't expose watch history via API — export it:
+
+1. [takeout.google.com](https://takeout.google.com) → *YouTube and YouTube
+   Music* → *History* → export.
+2. Unzip, find `watch-history.html` (and/or `search-history.html`).
+3. `dream sync youtube --opt "path=~/Downloads/.../watch-history.html"`
+   — or pass a list via the API/dashboard: `{"paths": [".../watch-history.html", ".../search-history.html"]}`.
+   JSON activity exports work too (`path=file.json`).
+
+### Telegram
+
+1. Message [@BotFather](https://t.me/BotFather) → `/newbot` → copy the token.
+2. `dream config --telegram-token 123456:ABC...`
+3. `dream telegram-bot` — the bot then supports:
+
+   | Command | Does |
+   |---|---|
+   | `/ask <question>` | LLM answer grounded in your memory |
+   | `/search <query>` | hybrid search, top 5 |
+   | `/stats` | corpus stats |
+   | `/remember <text>` | save a note |
+   | `/export <query>` | sends matching memories back **as a .md file** |
+   | `/sync <source> [k=v]` | trigger any source sync |
+   | *(any other text)* | saved as a memory |
+   | *(send a document/photo)* | downloaded to `~/.internet-dream/inbox/` and indexed if text-readable |
+
+   `dream sync telegram` also dumps recent `getUpdates` into the store.
 
 ## LLM providers
 

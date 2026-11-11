@@ -360,6 +360,12 @@
           <span id="conn-status" class="stat-sub" style="margin-left:12px"></span>
         </div>
         <div class="card">
+          <h3>Google account</h3>
+          <p class="sub" style="margin-top:0">One backend consent unlocks Gmail, Calendar, Drive, and Photos for every client — dashboard, Android, extension, Telegram bot.</p>
+          <a class="btn" href="${esc(state.apiBase)}/auth/google/start" target="_blank" rel="noopener">Connect Google account</a>
+          <p class="sub" style="margin-top:10px">Requires <code>~/.internet-dream/client_secret.json</code> and the redirect URI <code>${esc(state.apiBase)}/auth/google/callback</code> registered on the OAuth client.</p>
+        </div>
+        <div class="card">
           <h3>LLM provider</h3>
           <p class="sub" style="margin-top:0">Ask-mode generation is configured on the <code>dreamcore</code> backend, not here:</p>
           <pre class="answer" style="font-size:13px">dream config --provider openai-compatible \\

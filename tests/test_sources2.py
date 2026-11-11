@@ -1,0 +1,109 @@
+import time
+from pathlib import Path
+
+import pytest
+
+from dreamcore.sources import drive, telegram, youtube
+
+
+# ---------- telegram ----------
+
+def _tg_update(text="hello dream", uid=1):
+    return {"update_id": uid, "message": {
+        "message_id": uid, "date": 1735689600,
+        "chat": {"id": 42, "type": "private", "first_name": "Sam"},
+        "from": {"id": 7, "first_name": "Sam", "last_name": "Lee"},
+        "text": text}}
+
+
+def test_telegram_parse_text():
+    d = telegram.parse_update(_tg_update("remember the gate code"))
+    assert d.source == "telegram" and d.kind == "text"
+    assert "gate code" in d.text and d.sender == "Sam Lee"
+    assert d.chat == "Sam Lee" and d.ts == 1735689600.0
+
+
+def test_telegram_parse_photo_and_doc():
+    u = _tg_update()
+    u["message"].pop("text")
+    u["message"]["photo"] = [{"file_id": "s", "width": 90, "height": 90},
+                            {"file_id": "b", "width": 1280, "height": 720}]
+    d = telegram.parse_update(u)
+    assert d.kind == "photo" and "1280" in d.text
+    u["message"]["document"] = {"file_id": "f", "file_name": "notes.pdf",
+                                "file_size": 12345}
+    d = telegram.parse_update(u)
+    assert d.kind == "document" and "notes.pdf" in d.text
+
+
+def test_telegram_parse_ignores_service():
+    assert telegram.parse_update({"update_id": 9}) is None
+    assert telegram.parse_update({"update_id": 9, "message": {"chat": {}}}) is None
+
+
+def test_telegram_group_chat_name():
+    u = _tg_update()
+    u["message"]["chat"] = {"id": 1, "type": "group", "title": "Dream Team"}
+    d = telegram.parse_update(u)
+    assert d.chat == "Dream Team"
+
+
+# ---------- youtube takeout ----------
+
+_TAKEOUT_HTML = """<html><body>
+<div class="content-cell">
+  <a href="https://www.youtube.com/watch?v=abc123" class="paper-material">Great Lo-Fi Mix</a>
+  <div class="meta"><ul>
+    <li><a href="https://www.youtube.com/channel/UCxyz">Lofi Girl</a></li>
+    <li>Watched on 4 October 2026, 19:12</li>
+  </ul></div>
+</div>
+<div class="content-cell">
+  <a href="https://www.youtube.com/watch?v=def456">Second Video &amp; More</a>
+  <div class="meta"><ul><li>Watched on 5 October 2026, 20:00</li></ul></div>
+</div>
+</body></html>"""
+
+
+def test_youtube_parse_html(tmp_path):
+    f = tmp_path / "watch-history.html"
+    f.write_text(_TAKEOUT_HTML, encoding="utf-8")
+    docs = youtube.parse_watch_history_html(f)
+    assert len(docs) == 2
+    assert "Great Lo-Fi" in docs[0].title and "Lofi Girl" in docs[0].text
+    assert "youtube.com/watch?v=abc123" in docs[0].text
+    assert docs[0].source == "youtube" and docs[0].kind == "watch"
+    assert "Second Video" in docs[1].title  # html entity decoded
+
+
+def test_youtube_parse_json(tmp_path):
+    f = tmp_path / "activity.json"
+    f.write_text('[{"title":"My Video","titleUrl":"https://youtu.be/x",'
+                 '"time":"2026-10-04T19:12:00.000Z","header":"YouTube"}]',
+                 encoding="utf-8")
+    docs = youtube.parse_takeout_json(f)
+    assert len(docs) == 1 and docs[0].ts is not None
+
+
+def test_youtube_needs_path(tmp_path):
+    from dreamcore.sources.sync import sync_source
+    from dreamcore.store import Store
+    from dreamcore.embed import HashEmbedder
+    store = Store(tmp_path / "s.db")
+    with pytest.raises(ValueError):
+        list(youtube.iter_youtube({}))
+    store.close()
+
+
+# ---------- drive ----------
+
+def test_drive_parse_meta():
+    f = {"id": "f1", "name": "Q3 Report.docx",
+         "mimeType": "application/vnd.google-apps.document",
+         "modifiedTime": "2026-10-01T12:00:00.000Z", "size": "12345",
+         "webViewLink": "https://drive.google.com/x",
+         "owners": [{"displayName": "Sam"}]}
+    d = drive.parse_file_meta(f)
+    assert d.source == "drive" and "Q3 Report" in d.title
+    assert "Sam" in d.text and "12345" in d.text
+    assert d.metadata["file_id"] == "f1"

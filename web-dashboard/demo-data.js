@@ -11,7 +11,13 @@ window.DEMO_SOURCES = [
   { id: "browser", label: "Browser history", description: "Chrome/Chromium + Firefox visited pages",
     requires_google_auth: false, options: { which: null, max_results: 20000 } },
   { id: "files", label: "Local files", description: "Text-readable files in a directory (chunked)",
-    requires_google_auth: false, options: { path: ".", max_files: 5000 } }
+    requires_google_auth: false, options: { path: ".", max_files: 5000 } },
+  { id: "drive", label: "Google Drive", description: "File metadata + text content (readonly scope)",
+    requires_google_auth: true, options: { max_results: 5000, include_text: true, query: "trashed=false" } },
+  { id: "youtube", label: "YouTube history", description: "Watch/search history from Google Takeout export",
+    requires_google_auth: false, options: { path: "~/Downloads/.../watch-history.html" } },
+  { id: "telegram", label: "Telegram", description: "Recent bot-visible messages (needs bot token)",
+    requires_google_auth: false, options: { max_results: 1000 } }
 ];
 
 window.DEMO = {
