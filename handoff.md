@@ -75,6 +75,20 @@
 - config.json: telegram_api_id/hash fields; pyproject [telegram] extra.
 - Tests: 31/31 pass.
 
+## Phase 8 — Real-machine validation + Discord API source (in progress)
+- Verified on real data (read-only, no messages sent):
+  - browser sync: 13,071 Chrome history docs (incl. YouTube visits)
+  - files sync: Downloads + Documents → 6,969 chunks (incl. Zoom/Tamayuz
+    meeting transcripts)
+  - `dream serve` live on 127.0.0.1:8765 → 20,040+ docs; Gemini
+    (gemini-2.5-flash) /ask answers with real citations.
+- sources/discord_api.py: read-only Discord REST export — user token
+  from ~/.internet-dream/discord_token.txt (0600) or config
+  discord_token; GET /users/@me/guilds → channels → messages, 429-aware,
+  optional include_dms + guild filter. Registered as `discord` source.
+- Tests: 34/34 pass.
+- Discord sync running against 35 real guilds (max 300 msgs/channel).
+
 ## Known gaps / next actions
 - Google sources need client_secret.json + one consent (web or CLI).
 - Telegram userbot needs api_id/api_hash + interactive login (can't

@@ -9,7 +9,8 @@ from __future__ import annotations
 from typing import Callable, Iterator
 
 from ..store import Document, Store
-from . import browser, calendar, drive, files, gmail, photos, telegram, youtube
+from . import (browser, calendar, discord_api, drive, files, gmail, photos,
+               telegram, youtube)
 
 BATCH = 100
 
@@ -52,6 +53,10 @@ def _drive(opts) -> Iterator[Document]:
 
 def _youtube(opts) -> Iterator[Document]:
     yield from youtube.iter_youtube(opts)
+
+
+def _discord(opts) -> Iterator[Document]:
+    yield from discord_api.iter_discord(opts)
 
 
 def _telegram(opts) -> Iterator[Document]:
@@ -110,6 +115,14 @@ SOURCES: dict[str, dict] = {
         "requires_google_auth": False,
         "factory": _youtube,
         "options": {"path": "~/Downloads/.../watch-history.html"},
+    },
+    "discord": {
+        "label": "Discord",
+        "description": "Your servers' messages via user token (read-only)",
+        "requires_google_auth": False,
+        "factory": _discord,
+        "options": {"max_per_channel": 500, "include_dms": False,
+                    "guild": None},
     },
     "telegram": {
         "label": "Telegram",

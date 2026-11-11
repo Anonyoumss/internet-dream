@@ -107,3 +107,33 @@ def test_drive_parse_meta():
     assert d.source == "drive" and "Q3 Report" in d.title
     assert "Sam" in d.text and "12345" in d.text
     assert d.metadata["file_id"] == "f1"
+
+
+# ---------- discord api ----------
+
+def test_discord_msg_to_doc():
+    from dreamcore.sources import discord_api
+    msg = {
+        "id": "123", "channel_id": "c1",
+        "content": "hello world",
+        "timestamp": "2026-10-01T12:00:00.000Z",
+        "author": {"username": "sam", "global_name": "Sam"},
+        "attachments": [{"filename": "pic.png", "url": "https://x/pic.png"}],
+        "embeds": [],
+    }
+    d = discord_api._msg_to_doc("general", "MyGuild", msg)
+    assert d.source == "discord" and d.sender == "Sam"
+    assert "hello world" in d.text and "pic.png" in d.text
+    assert "MyGuild / #general" in d.chat
+    assert d.ts is not None
+
+
+def test_discord_msg_empty_skipped():
+    from dreamcore.sources import discord_api
+    assert discord_api._msg_to_doc("c", "g", {"content": "  "}) is None
+
+
+def test_discord_source_registered():
+    from dreamcore.sources.sync import SOURCES
+    assert "discord" in SOURCES
+    assert SOURCES["discord"]["requires_google_auth"] is False
