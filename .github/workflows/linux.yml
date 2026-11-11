@@ -23,6 +23,25 @@ jobs:
           mkdir -p dist/internet-dream-linux
           cp -r desktop-linux/* dist/internet-dream-linux/
           cp -r core dist/internet-dream-linux/core
+          cat > dist/internet-dream-linux/INSTALL.md <<'EOF'
+# Internet's Dream — Linux
+
+```bash
+cd internet-dream-linux/desktop-linux
+./run.sh            # creates .venv, installs PyQt6 + dreamcore[google,telegram]
+```
+
+The `dream` CLI lands in `desktop-linux/.venv/bin/dream`:
+
+```bash
+dream serve                 # backend API on :8765
+dream tg-login && dream tg-sync   # Telegram userbot (needs api_id/hash)
+dream auth                  # Google OAuth (or use dashboard Connect button)
+dream sync gmail|calendar|drive|photos|youtube|browser|files|telegram
+```
+
+Point the web dashboard / Android app / extension at http://<this-host>:8765.
+EOF
           tar -czf dist/internet-dream-linux-x86_64.tar.gz -C dist internet-dream-linux
       - uses: actions/upload-artifact@v4
         with:

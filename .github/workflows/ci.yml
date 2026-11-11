@@ -13,8 +13,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install dreamcore
-        run: pip install -e core pytest
+      - name: Install dreamcore (all extras)
+        run: pip install -e 'core[google,telegram]' pytest
       - name: Run tests
         run: python -m pytest tests -q
       - name: Byte-compile all python

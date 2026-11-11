@@ -380,6 +380,11 @@ dream config --provider openai-compatible \\
   --base-url http://localhost:11434/v1 --model llama3.1</pre>
         </div>
         <div class="card">
+          <h3>Telegram</h3>
+          <p class="sub" style="margin-top:0">Bot mode: <code>dream config --telegram-token … && dream telegram-bot</code>.
+          Full account (Telethon userbot): <code>dream config --tg-api-id … --tg-api-hash … && dream tg-login && dream tg-sync && dream tg-bot</code> — assistant lives in Saved Messages, files sent there get indexed.</p>
+        </div>
+        <div class="card">
           <h3>Privacy</h3>
           <p class="sub" style="margin-top:0">• All memories are AES-256-GCM encrypted at rest.<br>
           • Search index stores metadata only (sender, chat, date).<br>

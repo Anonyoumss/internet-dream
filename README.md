@@ -121,6 +121,12 @@ GitHub Pages site works with zero backend. Live mode connects to `dreamcore serv
 
 ## How it works
 
+Every client — web dashboard, macOS app, Android app, Linux client,
+browser extension, Telegram bot/userbot — is a thin shell over the same
+`dreamcore serve` API, so **every feature is available on every platform**
+automatically. There is exactly one backend (`dream serve`), one token
+store, one encrypted database.
+
 Ingestion parses an export into `Document`s → text is embedded → payloads
 are encrypted and stored; FTS5 indexes metadata only (sender/chat/date/title —
 a documented trade-off). `/ask` retrieves the top-k memories, injects them
