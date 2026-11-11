@@ -10,7 +10,7 @@ from typing import Callable, Iterator
 
 from ..store import Document, Store
 from . import (browser, calendar, discord_api, drive, files, gmail, photos,
-               telegram, youtube)
+               telegram, whatsapp, youtube)
 
 BATCH = 100
 
@@ -57,6 +57,12 @@ def _youtube(opts) -> Iterator[Document]:
 
 def _discord(opts) -> Iterator[Document]:
     yield from discord_api.iter_discord(opts)
+
+
+def _whatsapp(opts) -> Iterator[Document]:
+    yield from whatsapp.iter_exports(
+        opts.get("path", "~/Downloads"),
+        max_files=int(opts.get("max_files", 200)))
 
 
 def _telegram(opts) -> Iterator[Document]:
@@ -123,6 +129,14 @@ SOURCES: dict[str, dict] = {
         "factory": _discord,
         "options": {"max_per_channel": 500, "include_dms": False,
                     "guild": None},
+    },
+    "whatsapp": {
+        "label": "WhatsApp",
+        "description": "Chat exports (_chat.txt) found in a folder — "
+                       "export from WhatsApp → attach .txt → drop here",
+        "requires_google_auth": False,
+        "factory": _whatsapp,
+        "options": {"path": "~/Downloads", "max_files": 200},
     },
     "telegram": {
         "label": "Telegram",

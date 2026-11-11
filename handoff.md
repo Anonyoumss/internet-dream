@@ -89,6 +89,22 @@
 - Tests: 34/34 pass.
 - Discord sync running against 35 real guilds (max 300 msgs/channel).
 
+## Phase 9 — Agent chat + onboarding + WhatsApp source (done)
+- dreamcore/agent.py: tool-calling loop (search_memory, remember,
+  sync_source, get_stats, list_sources) over OpenAI-compatible function
+  calling; graceful degradation for anthropic/no-tools providers.
+- API: POST /chat {message, history} → {answer, steps, sources};
+  POST /ingest-upload (multipart .txt/.json → ~/.internet-dream/inbox/).
+- sources/whatsapp.py: scans a folder for WhatsApp _chat.txt exports.
+- Dashboard: Ask → Chat (conversation UI + tool-step chips), new Setup
+  wizard page (#/setup: API key → Google → sources → Telegram → chat),
+  Sources page export-upload control. Nav updated.
+- pyproject: +python-multipart.
+- Tests: 36/36 pass. Live-verified: /chat answered stats + Discord
+  questions via real tool calls (Gemini 2.5 Flash).
+- Real store at last check: ~43k docs (discord sync still running:
+  browser 13,071 · discord 23,300+ · files 6,969).
+
 ## Known gaps / next actions
 - Google sources need client_secret.json + one consent (web or CLI).
 - Telegram userbot needs api_id/api_hash + interactive login (can't

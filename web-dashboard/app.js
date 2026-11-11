@@ -166,6 +166,62 @@
     $("#q").addEventListener("keydown", (e) => e.key === "Enter" && run());
   }
 
+  // ---------- chat (agent) ----------
+  const chatState = { history: [] };
+
+  function renderChat() {
+    view.innerHTML = `
+      <h1>Chat</h1>
+      <p class="sub">Your AI agent — it can search memory, sync sources, and save notes. Everything stays in your encrypted local store.</p>
+      <div id="chat-log" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px"></div>
+      <div class="ask-box">
+        <input id="chat-in" type="text" placeholder="e.g. What did I work on this week? Sync my email." autofocus>
+        <button class="btn" id="chat-go">Send</button>
+      </div>`;
+    const log = $("#chat-log");
+    const push = (role, html) => {
+      const d = document.createElement("div");
+      d.className = role === "user" ? "mem" : "answer";
+      d.style.whiteSpace = "pre-wrap";
+      d.innerHTML = html;
+      log.appendChild(d);
+      d.scrollIntoView({ block: "end", behavior: "smooth" });
+      return d;
+    };
+    push("assistant",
+      state.live
+        ? "Hey — I'm your second brain. Ask me anything about your digital life, or tell me to sync/import something."
+        : "Demo mode — connect <code>dream serve</code> for the real agent. This chat needs a live backend + LLM key.");
+
+    const run = async () => {
+      const inp = $("#chat-in");
+      const q = inp.value.trim();
+      if (!q) return;
+      inp.value = "";
+      push("user", esc(q));
+      const pending = push("assistant", "Thinking…");
+      if (state.live) {
+        try {
+          const r = await api("/chat", { method: "POST",
+            body: JSON.stringify({ message: q, history: chatState.history }) });
+          const steps = (r.steps || []).map((s) =>
+            `<div class="chip" style="margin:2px 4px 2px 0">⚙ ${esc(s.tool)}(${esc(JSON.stringify(s.args).slice(0, 80))})</div>`).join("");
+          pending.innerHTML = esc(r.answer || "(no answer)") +
+            (steps ? `\n\n${steps}` : "");
+          chatState.history.push({ role: "user", content: q });
+          chatState.history.push({ role: "assistant", content: r.answer || "" });
+          if (chatState.history.length > 40) chatState.history = chatState.history.slice(-40);
+        } catch (e) {
+          pending.textContent = `Chat failed: ${e.message}`;
+        }
+      } else {
+        pending.textContent = "Start `dream serve` and set an API key (Setup page) to enable the agent.";
+      }
+    };
+    $("#chat-go").addEventListener("click", run);
+    $("#chat-in").addEventListener("keydown", (e) => e.key === "Enter" && run());
+  }
+
   function renderAsk() {
     view.innerHTML = `
       <h1>Ask your second brain</h1>
@@ -222,7 +278,14 @@
     } else {
       sources = window.DEMO_SOURCES;
     }
-    el.innerHTML = sources.map((s) => `
+    el.innerHTML = `
+      <div class="card" style="margin-bottom:14px">
+        <h3>Drop a chat export</h3>
+        <p class="sub" style="margin-top:0">WhatsApp: chat → ⋮ → More → Export chat → attach .txt. Discord: DiscordChatExporter .json. Upload it here — parsed and encrypted automatically.</p>
+        <input type="file" id="export-file" accept=".txt,.json" ${state.live ? "" : "disabled"}>
+        <button class="btn tonal" id="export-upload" ${state.live ? "" : "disabled"} style="margin-left:8px">Upload & index</button>
+        <span id="export-status" class="stat-sub" style="margin-left:12px"></span>
+      </div>` + sources.map((s) => `
       <div class="card" style="margin-bottom:14px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
           <div>
@@ -238,6 +301,23 @@
         </div>
         <div class="src-result" data-result="${esc(s.id)}" style="font-size:13px;color:var(--md-sys-color-on-surface-variant);margin-top:8px"></div>
       </div>`).join("");
+
+    const upBtn = $("#export-upload");
+    if (upBtn) upBtn.addEventListener("click", async () => {
+      const f = $("#export-file").files[0];
+      const st = $("#export-status");
+      if (!f) { st.textContent = "pick a file first"; return; }
+      st.textContent = "uploading…";
+      try {
+        const fd = new FormData();
+        fd.append("file", f);
+        const r = await fetch(state.apiBase + "/ingest-upload", { method: "POST", body: fd });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || r.statusText);
+        st.textContent = `✓ indexed ${j.ingested} messages`;
+        detectLive();
+      } catch (e) { st.textContent = `failed: ${e.message}`; }
+    });
 
     el.querySelectorAll("[data-sync]").forEach((btn) => {
       btn.addEventListener("click", async () => {
@@ -403,8 +483,73 @@ dream config --provider openai-compatible \\
     });
   }
 
+  // ---------- setup wizard ----------
+  function renderSetup() {
+    view.innerHTML = `
+      <h1>Setup</h1>
+      <p class="sub">Five steps to a fully indexed second brain. Everything is local and encrypted — you only paste keys into your own backend.</p>
+      <div id="setup-steps"><p class="sub">Loading…</p></div>`;
+    loadSetup();
+  }
+
+  async function loadSetup() {
+    const el = $("#setup-steps");
+    let auth = { google: {}, telegram: {} }, sources = window.DEMO_SOURCES, cfg = null;
+    if (state.live) {
+      try { auth = await api("/auth/status"); } catch {}
+      try { sources = await api("/sources"); } catch {}
+      try { cfg = await api("/config"); } catch {}
+    }
+    const step = (n, title, body, done) => `
+      <div class="card" style="margin-bottom:14px">
+        <h3>${done ? "✅" : `${n}.`} ${esc(title)}</h3>
+        <div>${body}</div>
+      </div>`;
+    const keyDone = !!(cfg && cfg.api_key);
+    el.innerHTML =
+      step(1, "LLM API key", `
+        <p class="sub" style="margin-top:0">Paste a key from OpenAI, Gemini, Groq, OpenRouter, Anthropic, or any OpenAI-compatible endpoint. Stored only in <code>~/.internet-dream/config.json</code> (0600).</p>
+        <div class="field"><label>API key</label><input id="llm-key" type="password" placeholder="sk-… / AIza…"></div>
+        <div class="field"><label>Base URL (optional)</label><input id="llm-url" placeholder="https://generativelanguage.googleapis.com/v1beta/openai"></div>
+        <div class="field"><label>Model</label><input id="llm-model" placeholder="gemini-2.5-flash"></div>
+        <button class="btn" id="save-llm" ${state.live ? "" : "disabled"}>Save key</button>
+        <span id="llm-status" class="stat-sub" style="margin-left:12px"></span>`, keyDone) +
+      step(2, "Google account (Gmail · Calendar · Drive · Photos · YouTube)", `
+        <p class="sub" style="margin-top:0">One consent unlocks all Google sources for every client.</p>
+        <p class="sub">${auth.google && auth.google.token_present
+          ? "✅ Connected" : "Requires <code>~/.internet-dream/client_secret.json</code> (Google Cloud → OAuth client → Desktop app)."}</p>
+        <a class="btn" href="${esc(state.apiBase)}/auth/google/start" target="_blank" rel="noopener">Connect Google</a>`,
+        !!(auth.google && auth.google.token_present)) +
+      step(3, "Connect sources", `
+        <p class="sub" style="margin-top:0">Browser history, files, WhatsApp exports, Discord, Telegram — see the Sources page for per-source sync.</p>
+        <a class="btn tonal" href="#/sources">Open Sources →</a>`, false) +
+      step(4, "Telegram", `
+        <p class="sub" style="margin-top:0">Bot: <code>dream config --telegram-token …</code> · Full account: <code>dream tg-login</code> then <code>dream tg-sync</code>. Status: ${auth.telegram && auth.telegram.bot_token ? "bot token set" : "not configured"}.</p>`,
+        !!(auth.telegram && auth.telegram.bot_token)) +
+      step(5, "Start chatting", `
+        <p class="sub" style="margin-top:0">Once a key + sources are set, the Chat page is your agent — it can search everything and trigger syncs for you.</p>
+        <a class="btn tonal" href="#/chat">Open Chat →</a>`, false);
+
+    const btn = $("#save-llm");
+    if (btn) btn.addEventListener("click", async () => {
+      const st = $("#llm-status");
+      st.textContent = "saving…";
+      const body = {};
+      const key = $("#llm-key").value.trim(), url = $("#llm-url").value.trim(),
+            model = $("#llm-model").value.trim();
+      if (key) body.api_key = key;
+      if (url) { body.base_url = url; body.provider = "openai-compatible"; }
+      if (model) body.model = model;
+      try {
+        await api("/config", { method: "PUT", body: JSON.stringify(body) });
+        st.textContent = "saved ✓ — try the Chat page";
+        setTimeout(loadSetup, 800);
+      } catch (e) { st.textContent = `failed: ${e.message}`; }
+    });
+  }
+
   // ---------- router ----------
-  const routes = { dashboard: renderDashboard, search: renderSearch, ask: renderAsk, sources: renderSources, graph: renderGraph, settings: renderSettings };
+  const routes = { dashboard: renderDashboard, search: renderSearch, chat: renderChat, ask: renderAsk, setup: renderSetup, sources: renderSources, graph: renderGraph, settings: renderSettings };
   function route() {
     const name = (location.hash.replace("#/", "") || "dashboard").split("?")[0];
     document.querySelectorAll(".rail-item").forEach((a) =>

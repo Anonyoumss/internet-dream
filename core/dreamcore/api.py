@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
@@ -44,6 +44,11 @@ class IngestText(BaseModel):
 
 class AskIn(BaseModel):
     question: str
+
+
+class ChatIn(BaseModel):
+    message: str
+    history: list[dict] | None = None
 
 
 class SyncIn(BaseModel):
@@ -141,6 +146,37 @@ def create_app(db_path: str | os.PathLike | None = None,
             return {"answer": answer, "sources": [h.__dict__ for h in hits],
                     "llm_error": str(e)}
         return {"answer": answer, "sources": [h.__dict__ for h in hits]}
+
+    @app.post("/chat")
+    def chat(body: ChatIn):
+        """Agent chat — LLM with tools over the memory store."""
+        from .agent import run_agent
+        history = (body.history or [])[-20:]
+        messages = history + [{"role": "user", "content": body.message}]
+        try:
+            return run_agent(store, embedder, messages)
+        except Exception as e:
+            raise HTTPException(502, f"agent failed: {e}")
+
+    @app.post("/ingest-upload")
+    async def ingest_upload(file: UploadFile):
+        """Upload a chat export (.txt WhatsApp / .json Discord) — saved to
+        ~/.internet-dream/inbox/ then parsed."""
+        inbox = Path.home() / ".internet-dream" / "inbox"
+        inbox.mkdir(parents=True, exist_ok=True)
+        dest = inbox / (file.filename or "upload.bin")
+        dest.write_bytes(await file.read())
+        name = dest.name.lower()
+        if name.endswith(".txt") or "_chat" in name:
+            docs = parse_whatsapp_export(dest)
+        elif name.endswith(".json"):
+            docs = parse_discord_export(dest)
+        else:
+            raise HTTPException(400, "unsupported export format (.txt or .json)")
+        texts = [f"{d.title}\n{d.text}" for d in docs]
+        vecs = _embed_texts(texts)
+        store.add_many(zip(docs, vecs))
+        return {"ingested": len(docs), "saved": str(dest)}
 
     @app.get("/sources")
     def sources():

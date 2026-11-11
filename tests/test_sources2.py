@@ -137,3 +137,24 @@ def test_discord_source_registered():
     from dreamcore.sources.sync import SOURCES
     assert "discord" in SOURCES
     assert SOURCES["discord"]["requires_google_auth"] is False
+
+
+# ---------- whatsapp folder source + agent ----------
+
+def test_whatsapp_source_registered():
+    from dreamcore.sources.sync import SOURCES
+    assert "whatsapp" in SOURCES
+    assert SOURCES["whatsapp"]["requires_google_auth"] is False
+
+
+def test_agent_dispatch_remember(tmp_path):
+    from dreamcore.store import Store
+    from dreamcore.embed import HashEmbedder
+    from dreamcore import agent
+    store = Store(tmp_path / "a.db")
+    emb = HashEmbedder()
+    out = agent._tool_remember(store, emb, {"title": "t", "text": "hello"})
+    assert "Saved" in out
+    hits = store.hybrid_search("hello", emb.embed("hello"), 3)
+    assert hits and "hello" in hits[0].snippet
+    store.close()
