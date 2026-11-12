@@ -129,7 +129,10 @@
 - Verified live: /speak returns real MP3, scheduler job ran (heartbeat
   memory written), /export, /forget, /research (memory mode), /jobs CRUD.
 - Bug fixed: scheduler last_run persistence; _parse_json_array robustness.
-- Tests: 39/39 pass.
+- mobile-flutter/: full Material 3 Expressive app — Dashboard, Search,
+  Chat (agent + deep-research toggle), Sources sync, Settings.
+  flutter analyze clean, widget test passes.
+- Tests: 39/39 pytest + flutter test pass.
 
 ## Known gaps / next actions
 - Google sources need client_secret.json + one consent (web or CLI).

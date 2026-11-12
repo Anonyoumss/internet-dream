@@ -22,8 +22,8 @@ class Api {
         headers: {'Content-Type': 'application/json'}, body: jsonEncode(body));
     if (r.statusCode != 200) {
       String detail = r.reasonPhrase ?? 'error';
-      try { detail = jsonDecode(r.body)['detail'] ?? detail; } catch (_) {}
-      throw Exception('$detail');
+      try { detail = jsonDecode(r.body)['detail']?.toString() ?? detail; } catch (_) {}
+      throw Exception(detail);
     }
     return jsonDecode(r.body);
   }
@@ -31,10 +31,11 @@ class Api {
 
 // ---------- theme: Material 3 Expressive ----------
 ThemeData dreamTheme(Brightness b) {
+  final dark = b == Brightness.dark;
   final scheme = ColorScheme.fromSeed(
     seedColor: const Color(0xFF6D4BD8),
     brightness: b,
-    primary: b == Brightness.light ? const Color(0xFF6D4BD8) : const Color(0xFFD6BCFF),
+    primary: dark ? const Color(0xFFD6BCFF) : const Color(0xFF6D4BD8),
   );
   return ThemeData(
     useMaterial3: true,
@@ -64,12 +65,13 @@ ThemeData dreamTheme(Brightness b) {
     navigationBarTheme: NavigationBarThemeData(
       height: 72,
       labelTextStyle: WidgetStatePropertyAll(
-        TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+          TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
       iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
-        size: 26,
-        color: states.contains(WidgetState.selected)
-            ? scheme.primary : scheme.onSurfaceVariant,
-      )),
+            size: 26,
+            color: states.contains(WidgetState.selected)
+                ? scheme.primary
+                : scheme.onSurfaceVariant,
+          )),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -113,12 +115,12 @@ class StatCard extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(label.toUpperCase(), style: TextStyle(
-            fontSize: 11, fontWeight: FontWeight.w800,
-            letterSpacing: 1, color: cs.onSurfaceVariant)),
+              fontSize: 11, fontWeight: FontWeight.w800,
+              letterSpacing: 1, color: cs.onSurfaceVariant)),
           const SizedBox(height: 8),
           Text(value, style: TextStyle(
-            fontSize: 32, fontWeight: FontWeight.w800,
-            color: cs.primary, letterSpacing: -1)),
+              fontSize: 32, fontWeight: FontWeight.w800,
+              color: cs.primary, letterSpacing: -1)),
           const SizedBox(height: 4),
           Text(sub, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
         ]),
@@ -148,7 +150,8 @@ class MemTile extends StatelessWidget {
             style: TextStyle(color: cs.onPrimaryContainer, fontWeight: FontWeight.w800),
           ),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+        title: Text(title,
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
         subtitle: Text(
           '${sender.isEmpty ? source : sender} · ${text.length > 140 ? '${text.substring(0, 140)}…' : text}',
           maxLines: 2, overflow: TextOverflow.ellipsis,
@@ -187,6 +190,7 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final bySource = (stats?['by_source'] as Map?) ?? {};
     return Scaffold(
       appBar: AppBar(title: const Text("Dashboard")),
       body: RefreshIndicator(
@@ -205,20 +209,20 @@ class _DashboardPageState extends State<DashboardPage> {
               )),
             if (stats != null) ...[
               GridView.count(
-                crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2, shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
                 mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 1.5,
                 children: [
                   StatCard('Memories', '${stats!['total']}', 'encrypted · AES-256-GCM'),
-                  ...((stats!['by_source'] as Map?)?.entries ?? const Iterable<MapEntry<String, dynamic>>.empty())
-                      .take(3)
-                      .map((e) => StatCard(e.key, '${e.value}', 'indexed documents')),
+                  ...bySource.entries.take(3)
+                      .map((e) => StatCard('${e.key}', '${e.value}', 'indexed documents')),
                 ],
               ),
               const SizedBox(height: 20),
             ],
             Text('RECENT MEMORIES', style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1,
-              color: cs.onSurfaceVariant)),
+                fontSize: 11, fontWeight: FontWeight.w800,
+                letterSpacing: 1, color: cs.onSurfaceVariant)),
             const SizedBox(height: 8),
             ...recent.map((m) => MemTile(Map<String, dynamic>.from(m as Map))),
           ],
@@ -276,7 +280,8 @@ class _SearchPageState extends State<SearchPage> {
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 18),
-              children: hits.map((h) => MemTile(Map<String, dynamic>.from(h as Map))).toList(),
+              children:
+                  hits.map((h) => MemTile(Map<String, dynamic>.from(h as Map))).toList(),
             ),
           ),
         ]),
@@ -296,6 +301,7 @@ class _ChatPageState extends State<ChatPage> {
   ];
   final history = <Map<String, String>>[];
   bool busy = false;
+  bool research = false;
 
   Future<void> send() async {
     final msg = q.text.trim();
@@ -307,16 +313,25 @@ class _ChatPageState extends State<ChatPage> {
     });
     history.add({'role': 'user', 'content': msg});
     try {
-      final r = await Api.post('/chat', {'message': msg, 'history': history});
-      final answer = (r['answer'] ?? '').toString();
-      final steps = (r['steps'] as List? ?? [])
-          .map((s) => '⚙ ${s['tool']}').join('  ');
-      setState(() {
-        log.add({'role': 'assistant', 'text': '$answer${steps.isEmpty ? '' : '\n\n$steps'}'});
-        busy = false;
-      });
-      history.add({'role': 'assistant', 'content': answer});
-      if (history.length > 40) history.removeRange(0, history.length - 40);
+      if (research) {
+        final r = await Api.post('/research', {'question': msg, 'use_web': true});
+        setState(() {
+          log.add({'role': 'assistant', 'text': (r['report'] ?? '').toString()});
+          busy = false;
+        });
+      } else {
+        final r = await Api.post('/chat', {'message': msg, 'history': history});
+        final answer = (r['answer'] ?? '').toString();
+        final steps = (r['steps'] as List? ?? [])
+            .map((s) => '⚙ ${s['tool']}').join('  ');
+        setState(() {
+          log.add({'role': 'assistant',
+              'text': '$answer${steps.isEmpty ? '' : '\n\n$steps'}'});
+          busy = false;
+        });
+        history.add({'role': 'assistant', 'content': answer});
+        if (history.length > 40) history.removeRange(0, history.length - 40);
+      }
     } catch (e) {
       setState(() {
         log.add({'role': 'assistant', 'text': 'Chat failed: $e'});
@@ -331,6 +346,16 @@ class _ChatPageState extends State<ChatPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Chat')),
       body: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+          child: Row(children: [
+            FilterChip(
+              label: const Text('Deep research'),
+              selected: research,
+              onSelected: (v) => setState(() => research = v),
+            ),
+          ]),
+        ),
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -343,14 +368,15 @@ class _ChatPageState extends State<ChatPage> {
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * .82),
+                  constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * .82),
                   decoration: BoxDecoration(
                     color: isUser ? cs.primaryContainer : cs.surfaceContainer,
                     borderRadius: BorderRadius.circular(22),
                   ),
                   child: Text(m['text']!, style: TextStyle(
-                    color: isUser ? cs.onPrimaryContainer : cs.onSurface,
-                    fontSize: 14, height: 1.45)),
+                      color: isUser ? cs.onPrimaryContainer : cs.onSurface,
+                      fontSize: 14, height: 1.45)),
                 ),
               );
             },
@@ -363,11 +389,13 @@ class _ChatPageState extends State<ChatPage> {
             child: Row(children: [
               Expanded(child: TextField(
                 controller: q,
-                decoration: const InputDecoration(hintText: 'Message your second brain…'),
+                decoration: const InputDecoration(
+                    hintText: 'Message your second brain…'),
                 onSubmitted: (_) => send(),
               )),
               const SizedBox(width: 10),
-              FilledButton(onPressed: send, child: const Icon(Icons.send_rounded)),
+              FilledButton(onPressed: send,
+                  child: const Icon(Icons.send_rounded)),
             ]),
           ),
         ),
@@ -396,9 +424,9 @@ class _SourcesPageState extends State<SourcesPage> {
     } catch (e) { setState(() { error = '$e'; }); }
   }
 
-  Future<void> sync(String id, Map<String, dynamic> options, int index) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Syncing $id…')));
+  Future<void> sync(String id, Map<String, dynamic> options) async {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('Syncing $id…')));
     try {
       final r = await Api.post('/sync', {'source': id, 'options': options});
       if (mounted) {
@@ -407,7 +435,8 @@ class _SourcesPageState extends State<SourcesPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('sync failed: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('sync failed: $e')));
       }
     }
   }
@@ -420,29 +449,33 @@ class _SourcesPageState extends State<SourcesPage> {
           child: ListView(
             padding: const EdgeInsets.all(18),
             children: [
-              if (error != null) Card(child: Padding(
-                padding: const EdgeInsets.all(16), child: Text('Offline: $error'))),
-              ...sources.asMap().entries.map((e) {
-                final s = Map<String, dynamic>.from(e.value as Map);
+              if (error != null)
+                Card(child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text('Offline: $error'))),
+              ...sources.map((s0) {
+                final s = Map<String, dynamic>.from(s0 as Map);
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                       Row(children: [
                         Expanded(child: Text(s['label'],
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 15))),
                         FilledButton.tonal(
-                          onPressed: () => sync(s['id'], Map<String, dynamic>.from(s['options'] ?? {}), e.key),
+                          onPressed: () => sync(s['id'],
+                              Map<String, dynamic>.from(s['options'] ?? {})),
                           child: const Text('Sync'),
                         ),
                       ]),
                       const SizedBox(height: 6),
-                      Text(s['description'], style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 13),
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
+                      Text(s['description'],
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              fontSize: 13)),
                       const SizedBox(height: 4),
                       Text('${s['id']} · ${s['requires_google_auth'] == true ? 'google auth' : 'local'}',
                           style: TextStyle(fontSize: 11,
@@ -471,18 +504,29 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    Widget card(String title, Widget body) => Card(
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.w800,
+                  letterSpacing: 1, color: cs.onSurfaceVariant)),
+              const SizedBox(height: 10),
+              DefaultTextStyle(
+                style: TextStyle(
+                    color: cs.onSurfaceVariant, fontSize: 13, height: 1.5),
+                child: body),
+            ]),
+          ),
+        );
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(padding: const EdgeInsets.all(18), children: [
-        Card(child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('DREAMCORE API', style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1,
-              color: cs.onSurfaceVariant)),
-            const SizedBox(height: 10),
-            TextField(controller: base, decoration: const InputDecoration(
-              hintText: 'http://127.0.0.1:8765')),
+        card('DREAMCORE API', Column(
+          crossAxisAlignment: CrossAxisAlignment.start, children: [
+            TextField(controller: base,
+                decoration: const InputDecoration(
+                    hintText: 'http://127.0.0.1:8765')),
             const SizedBox(height: 12),
             Row(children: [
               FilledButton.tonal(
@@ -498,32 +542,13 @@ class _SettingsPageState extends State<SettingsPage> {
               const SizedBox(width: 12),
               Text(status, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13)),
             ]),
-          ]),
-        )),
+          ])),
         const SizedBox(height: 14),
-        Card(child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('LLM PROVIDER', style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1,
-              color: cs.onSurfaceVariant)),
-            const SizedBox(height: 10),
-            Text('Configured on the backend — paste your API key in the web dashboard Setup page or run:\n\ndream config --provider openai-compatible --base-url … --api-key … --model …',
-                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13, height: 1.5)),
-          ]),
-        )),
+        card('LLM PROVIDER', Text(
+            'Configured on the backend — paste your API key in the web dashboard Setup page or run:\n\ndream config --provider openai-compatible --base-url … --api-key … --model …')),
         const SizedBox(height: 14),
-        Card(child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('PRIVACY', style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1,
-              color: cs.onSurfaceVariant)),
-            const SizedBox(height: 10),
-            Text('• All memories AES-256-GCM encrypted at rest\n• Zero telemetry\n• Requests go only to your API base URL',
-                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13, height: 1.6)),
-          ]),
-        )),
+        card('PRIVACY', Text(
+            '• All memories AES-256-GCM encrypted at rest\n• Zero telemetry\n• Requests go only to your API base URL')),
       ]),
     );
   }
@@ -548,7 +573,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = const [
+    const pages = [
       DashboardPage(), SearchPage(), ChatPage(), SourcesPage(), SettingsPage(),
     ];
     return Scaffold(
@@ -556,12 +581,16 @@ class _HomePageState extends State<HomePage> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
         onDestinationSelected: (i) => setState(() => index = i),
-        destinations: [
-          const NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Home'),
-          const NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
-          const NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble), label: 'Chat'),
-          const NavigationDestination(icon: Icon(Icons.hub_outlined), selectedIcon: Icon(Icons.hub), label: 'Sources'),
-          const NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard), label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
+          NavigationDestination(icon: Icon(Icons.chat_bubble_outline),
+              selectedIcon: Icon(Icons.chat_bubble), label: 'Chat'),
+          NavigationDestination(icon: Icon(Icons.hub_outlined),
+              selectedIcon: Icon(Icons.hub), label: 'Sources'),
+          NavigationDestination(icon: Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings), label: 'Settings'),
         ],
       ),
       floatingActionButton: live
