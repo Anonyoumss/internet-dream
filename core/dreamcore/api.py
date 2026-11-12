@@ -66,6 +66,32 @@ class ConfigIn(BaseModel):
     embed_model: str | None = None
 
 
+class ResearchIn(BaseModel):
+    question: str
+    use_web: bool = True
+
+
+class SpeakIn(BaseModel):
+    text: str
+
+
+class VisionIn(BaseModel):
+    image_base64: str
+    mime: str = "image/png"
+    question: str = "Describe this image."
+
+
+class JobIn(BaseModel):
+    prompt: str
+    interval_seconds: int = 3600
+    enabled: bool = True
+
+
+class ForgetIn(BaseModel):
+    query: str
+    limit: int = 5
+
+
 
 
 def create_app(db_path: str | os.PathLike | None = None,
@@ -147,16 +173,178 @@ def create_app(db_path: str | os.PathLike | None = None,
                     "llm_error": str(e)}
         return {"answer": answer, "sources": [h.__dict__ for h in hits]}
 
+    # -- rate limiting (simple in-memory, per client IP) ----------------
+    from collections import defaultdict, deque
+    _hits: dict[str, deque] = defaultdict(deque)
+
+    def _rate_limit(request: Request, limit: int = 30, window: int = 60):
+        ip = request.client.host if request.client else "?"
+        now = __import__("time").time()
+        dq = _hits[ip]
+        while dq and now - dq[0] > window:
+            dq.popleft()
+        if len(dq) >= limit:
+            raise HTTPException(429, "rate limit — slow down")
+        dq.append(now)
+
     @app.post("/chat")
-    def chat(body: ChatIn):
+    def chat(body: ChatIn, request: Request):
         """Agent chat — LLM with tools over the memory store."""
         from .agent import run_agent
+        _rate_limit(request, limit=40, window=60)
         history = (body.history or [])[-20:]
         messages = history + [{"role": "user", "content": body.message}]
         try:
             return run_agent(store, embedder, messages)
         except Exception as e:
             raise HTTPException(502, f"agent failed: {e}")
+
+    @app.post("/research")
+    def research(body: ResearchIn):
+        """Deep research — plan → memory+web search → cited report."""
+        from .research import deep_research
+        try:
+            return deep_research(store, embedder, body.question,
+                                 use_web=body.use_web)
+        except Exception as e:
+            raise HTTPException(502, f"research failed: {e}")
+
+    @app.get("/export")
+    def export(q: str = "", limit: int = 500):
+        """Export matching memories as a Markdown file."""
+        from fastapi.responses import Response
+        if q:
+            hits = store.hybrid_search(q, embedder.embed(q), limit)
+            docs = [{"title": h.title, "sender": h.sender, "source": h.source,
+                     "chat": h.chat, "ts": h.ts, "snippet": h.snippet}
+                    for h in hits]
+        else:
+            docs = [d for d in store.iter_documents()][:limit]
+        lines = ["# Internet's Dream — memory export", ""]
+        for d in docs:
+            ts = ""
+            if d.get("ts"):
+                import datetime
+                ts = datetime.datetime.fromtimestamp(
+                    d["ts"]).strftime("%Y-%m-%d %H:%M")
+            lines += [
+                f"## {d.get('title','?')}",
+                f"*{d.get('sender') or '?'} · {d.get('source','?')}"
+                + (f" · {ts}" if ts else "") + "*",
+                "", d.get("text") or d.get("snippet") or "", "---", ""]
+        return Response(
+            "\n".join(lines), media_type="text/markdown",
+            headers={"Content-Disposition":
+                     "attachment; filename=internet-dream-export.md"})
+
+    @app.delete("/documents/{doc_id}")
+    def forget_doc(doc_id: str):
+        """Forget a single memory (GDPR-friendly)."""
+        if not store.delete(doc_id):
+            raise HTTPException(404, "not found")
+        return {"deleted": doc_id}
+
+    @app.post("/forget")
+    def forget_matching(body: ForgetIn):
+        """Forget memories matching a query (search → delete top N)."""
+        hits = store.hybrid_search(body.query, embedder.embed(body.query),
+                                   body.limit)
+        ids = []
+        for h in hits:
+            if store.delete(h.doc_id):
+                ids.append(h.doc_id)
+        return {"forgotten": len(ids), "ids": ids}
+
+    @app.post("/transcribe")
+    async def transcribe(file: UploadFile):
+        """Speech-to-text via faster-whisper (optional dependency)."""
+        try:
+            from faster_whisper import WhisperModel
+        except ImportError:
+            raise HTTPException(
+                501, "install faster-whisper: pip install faster-whisper")
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".audio", delete=False) as t:
+            t.write(await file.read())
+            tmp = t.name
+        try:
+            model = WhisperModel("base", device="cpu", compute_type="int8")
+            segments, _ = model.transcribe(tmp)
+            return {"text": " ".join(s.text for s in segments).strip()}
+        finally:
+            import os
+            os.unlink(tmp)
+
+    @app.post("/speak")
+    async def speak(body: SpeakIn):
+        """Text-to-speech via edge-tts (optional dependency)."""
+        try:
+            import io
+            import edge_tts
+            buf = io.BytesIO()
+            communicate = edge_tts.Communicate(body.text,
+                                                "en-US-AriaNeural")
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    buf.write(chunk["data"])
+            from fastapi.responses import Response
+            return Response(buf.getvalue(), media_type="audio/mpeg")
+        except ImportError:
+            raise HTTPException(501, "install edge-tts: pip install edge-tts")
+
+    @app.post("/vision")
+    def vision(body: VisionIn):
+        """Image understanding via the configured OpenAI-compatible model
+        (works with Gemini — it accepts image_url parts)."""
+        import base64
+        cfg = LLMConfig.load()
+        if cfg.provider != "openai-compatible":
+            raise HTTPException(400, "vision needs an openai-compatible provider")
+        import httpx
+        url = cfg.base_url.rstrip("/") + "/chat/completions"
+        headers = {"Content-Type": "application/json"}
+        if cfg.api_key:
+            headers["Authorization"] = f"Bearer {cfg.api_key}"
+        try:
+            r = httpx.post(url, headers=headers, timeout=120, json={
+                "model": cfg.model,
+                "messages": [{"role": "user", "content": [
+                    {"type": "text", "text": body.question},
+                    {"type": "image_url", "image_url": {
+                        "url": f"data:{body.mime};base64,{body.image_base64}"}},
+                ]}],
+                "max_tokens": 1024,
+            })
+            r.raise_for_status()
+            return {"answer": r.json()["choices"][0]["message"]["content"]}
+        except Exception as e:
+            raise HTTPException(502, f"vision failed: {e}")
+
+    # -- scheduled agent jobs --------------------------------------------
+
+    @app.get("/jobs")
+    def jobs_list():
+        from . import jobs as _jobs
+        return _jobs.list_jobs()
+
+    @app.post("/jobs")
+    def jobs_add(body: JobIn):
+        from . import jobs as _jobs
+        return _jobs.add_job(body.prompt, body.interval_seconds, body.enabled)
+
+    @app.delete("/jobs/{job_id}")
+    def jobs_delete(job_id: str):
+        from . import jobs as _jobs
+        if not _jobs.remove_job(job_id):
+            raise HTTPException(404, "job not found")
+        return {"deleted": job_id}
+
+    @app.on_event("startup")
+    async def _start_scheduler():
+        from . import jobs as _jobs
+        import asyncio
+        asyncio.create_task(
+            _jobs.scheduler_loop(store, embedder, log=print))
 
     @app.post("/ingest-upload")
     async def ingest_upload(file: UploadFile):

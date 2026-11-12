@@ -110,8 +110,26 @@
   manifest colors updated. Verified render via headless Chrome.
 - Live agent verified end-to-end: remember/search/sync tools write and
   read the real store (agent source docs present).
-- Real store: ~63k docs (browser 13,071 · discord 43,100+ and climbing ·
-  files 6,969 · agent 1).
+- Real store: 121,507 docs — discord sync COMPLETED (~88k messages
+  across 35 guilds), browser 13,071, files 6,969.
+
+## Phase 10 — Grok/Hermes feature set (done)
+- agent.py: +web_search (DDG HTML), +read_url, +current_time tools;
+  user-profile injection into system prompt; prompt-injection defense.
+- research.py: deep_research — plan→memory+web→synthesize cited report.
+- jobs.py: scheduled agent jobs (jobs.json, asyncio loop in serve).
+- api.py: POST /research, GET /export (md download), DELETE /documents/{id},
+  POST /forget, POST /transcribe (faster-whisper), POST /speak (edge-tts),
+  POST /vision (image_url → Gemini), /jobs CRUD, /chat rate limit (40/min),
+  scheduler startup hook. store.delete() added.
+- Dashboard: chat toolbar (Speak/Research/Forget), research mode,
+  listen button (TTS playback), voice input (MediaRecorder→/transcribe),
+  Automations page (#/jobs), export .md button on Sources.
+- edge-tts + faster-whisper installed in venv — voice works out of box.
+- Verified live: /speak returns real MP3, scheduler job ran (heartbeat
+  memory written), /export, /forget, /research (memory mode), /jobs CRUD.
+- Bug fixed: scheduler last_run persistence; _parse_json_array robustness.
+- Tests: 39/39 pass.
 
 ## Known gaps / next actions
 - Google sources need client_secret.json + one consent (web or CLI).

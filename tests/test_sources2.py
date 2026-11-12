@@ -158,3 +158,29 @@ def test_agent_dispatch_remember(tmp_path):
     hits = store.hybrid_search("hello", emb.embed("hello"), 3)
     assert hits and "hello" in hits[0].snippet
     store.close()
+
+
+# ---------- research / agent tools ----------
+
+def test_parse_json_array_robust():
+    from dreamcore.research import _parse_json_array
+    assert _parse_json_array('["a","b"]') == ["a", "b"]
+    assert _parse_json_array('```json\n["x","y"]\n```') == ["x", "y"]
+    out = _parse_json_array('Here you go:\n- query one\n- query two')
+    assert "query one" in out
+
+
+def test_strip_html():
+    from dreamcore.agent import _strip_html
+    assert "hello" in _strip_html("<p>hello <b>world</b></p><script>x()</script>")
+    assert "x()" not in _strip_html("<p>hi</p><script>x()</script>")
+
+
+def test_store_delete(tmp_path):
+    from dreamcore.store import Store, Document
+    store = Store(tmp_path / "d.db")
+    did = store.add(Document(source="t", kind="note", title="x", text="bye"), None)
+    assert store.count() == 1
+    assert store.delete(did) is True
+    assert store.count() == 0
+    store.close()

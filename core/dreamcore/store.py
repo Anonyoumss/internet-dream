@@ -172,6 +172,13 @@ class Store:
             "title": row["title"], **data,
         }
 
+    @_locked
+    def delete(self, doc_id: str) -> bool:
+        cur = self._conn.execute("DELETE FROM documents WHERE id=?", (doc_id,))
+        self._conn.execute("DELETE FROM search_index WHERE doc_id=?", (doc_id,))
+        self._conn.commit()
+        return cur.rowcount > 0
+
     def iter_documents(self):
         for row in self._conn.execute("SELECT * FROM documents"):
             yield self.get(row["id"])

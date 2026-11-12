@@ -174,10 +174,17 @@
       <h1>Chat</h1>
       <p class="sub">Your AI agent — it can search memory, sync sources, and save notes. Everything stays in your encrypted local store.</p>
       <div id="chat-log" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px"></div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <button class="btn outlined" id="chat-mic" title="Voice input">🎙 Speak</button>
+        <button class="btn outlined" id="chat-research" title="Deep research mode">🔬 Research</button>
+        <button class="btn outlined" id="chat-forget" title="Delete matching memories">🗑 Forget…</button>
+      </div>
       <div class="ask-box">
         <input id="chat-in" type="text" placeholder="e.g. What did I work on this week? Sync my email." autofocus>
         <button class="btn" id="chat-go">Send</button>
       </div>`;
+    let researchMode = false;
+    let lastAnswer = "";
     const log = $("#chat-log");
     const push = (role, html) => {
       const d = document.createElement("div");
@@ -202,14 +209,35 @@
       const pending = push("assistant", "Thinking…");
       if (state.live) {
         try {
-          const r = await api("/chat", { method: "POST",
-            body: JSON.stringify({ message: q, history: chatState.history }) });
-          const steps = (r.steps || []).map((s) =>
-            `<div class="chip" style="margin:2px 4px 2px 0">⚙ ${esc(s.tool)}(${esc(JSON.stringify(s.args).slice(0, 80))})</div>`).join("");
-          pending.innerHTML = esc(r.answer || "(no answer)") +
-            (steps ? `\n\n${steps}` : "");
+          if (researchMode) {
+            const r = await api("/research", { method: "POST",
+              body: JSON.stringify({ question: q, use_web: true }) });
+            lastAnswer = r.report || "";
+            const plan = (r.plan || []).map((p) => `• ${esc(p)}`).join("\n");
+            pending.innerHTML = esc(r.report || "(no report)") +
+              `\n\n<i>Plan:</i>\n${plan}`;
+          } else {
+            const r = await api("/chat", { method: "POST",
+              body: JSON.stringify({ message: q, history: chatState.history }) });
+            lastAnswer = r.answer || "";
+            const steps = (r.steps || []).map((s) =>
+              `<div class="chip" style="margin:2px 4px 2px 0">⚙ ${esc(s.tool)}(${esc(JSON.stringify(s.args).slice(0, 80))})</div>`).join("");
+            pending.innerHTML = esc(r.answer || "(no answer)") +
+              (steps ? `\n\n${steps}` : "") +
+              `\n\n<a href="#" id="speak-last" style="font-size:12px">🔊 listen</a>`;
+            const sl = pending.querySelector("#speak-last");
+            if (sl) sl.addEventListener("click", (ev) => {
+              ev.preventDefault();
+              fetch(state.apiBase + "/speak", { method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: lastAnswer.slice(0, 3000) }) })
+                .then((r) => r.blob()).then((b) => {
+                  new Audio(URL.createObjectURL(b)).play();
+                }).catch(() => {});
+            });
+          }
           chatState.history.push({ role: "user", content: q });
-          chatState.history.push({ role: "assistant", content: r.answer || "" });
+          chatState.history.push({ role: "assistant", content: lastAnswer || "" });
           if (chatState.history.length > 40) chatState.history = chatState.history.slice(-40);
         } catch (e) {
           pending.textContent = `Chat failed: ${e.message}`;
@@ -220,6 +248,54 @@
     };
     $("#chat-go").addEventListener("click", run);
     $("#chat-in").addEventListener("keydown", (e) => e.key === "Enter" && run());
+
+    // research mode toggle
+    $("#chat-research").addEventListener("click", (e) => {
+      researchMode = !researchMode;
+      e.target.textContent = researchMode ? "🔬 Research: ON" : "🔬 Research";
+      e.target.classList.toggle("tonal", researchMode);
+    });
+
+    // forget matching memories
+    $("#chat-forget").addEventListener("click", async () => {
+      const q = prompt("Forget memories matching this query (top 5 deleted):");
+      if (!q) return;
+      try {
+        const r = await api("/forget", { method: "POST",
+          body: JSON.stringify({ query: q, limit: 5 }) });
+        push("assistant", `Forgot ${r.forgotten} memories.`);
+      } catch (e) { push("assistant", `Forget failed: ${e.message}`); }
+    });
+
+    // voice input → /transcribe → fills the box
+    const micBtn = $("#chat-mic");
+    let recorder = null;
+    micBtn.addEventListener("click", async () => {
+      if (recorder && recorder.state === "recording") { recorder.stop(); return; }
+      if (!state.live) { push("assistant", "Voice needs a live backend + faster-whisper installed."); return; }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recorder = new MediaRecorder(stream);
+        const chunks = [];
+        recorder.ondataavailable = (e) => chunks.push(e.data);
+        recorder.onstop = async () => {
+          stream.getTracks().forEach((t) => t.stop());
+          micBtn.textContent = "🎙 Speak";
+          const blob = new Blob(chunks, { type: "audio/webm" });
+          const fd = new FormData();
+          fd.append("file", blob, "voice.webm");
+          try {
+            const r = await fetch(state.apiBase + "/transcribe", { method: "POST", body: fd });
+            const j = await r.json();
+            if (j.text) { $("#chat-in").value = j.text; $("#chat-in").focus(); }
+            else push("assistant", j.detail || "couldn't transcribe");
+          } catch (e) { push("assistant", `transcribe failed: ${e.message}`); }
+        };
+        recorder.start();
+        micBtn.textContent = "⏺ recording… click to stop";
+        setTimeout(() => recorder && recorder.state === "recording" && recorder.stop(), 15000);
+      } catch (e) { push("assistant", `mic failed: ${e.message}`); }
+    });
   }
 
   function renderAsk() {
@@ -285,6 +361,10 @@
         <input type="file" id="export-file" accept=".txt,.json" ${state.live ? "" : "disabled"}>
         <button class="btn tonal" id="export-upload" ${state.live ? "" : "disabled"} style="margin-left:8px">Upload & index</button>
         <span id="export-status" class="stat-sub" style="margin-left:12px"></span>
+        <div style="margin-top:10px">
+          <a class="btn outlined" href="${esc(state.apiBase)}/export" download ${state.live ? "" : "style='pointer-events:none;opacity:.5'"}>⬇ Export all memories (.md)</a>
+          <span class="stat-sub" style="margin-left:10px">GDPR export — decrypted on download, stored encrypted at rest.</span>
+        </div>
       </div>` + sources.map((s) => `
       <div class="card" style="margin-bottom:14px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
@@ -483,6 +563,59 @@ dream config --provider openai-compatible \\
     });
   }
 
+  // ---------- automations (scheduled agent jobs) ----------
+  function renderJobs() {
+    view.innerHTML = `
+      <h1>Automations</h1>
+      <p class="sub">Scheduled agent jobs — prompts the AI runs on a timer inside <code>dream serve</code>. Jobs can search memory, sync sources, and write recaps while you sleep.</p>
+      <div class="card" style="margin-bottom:18px">
+        <h3>New job</h3>
+        <div class="field"><label>Prompt</label><input id="job-prompt" placeholder="e.g. Summarize yesterday's activity and save it as 'Daily recap'"></div>
+        <div class="field"><label>Interval (seconds, min 60)</label><input id="job-interval" type="number" value="3600" min="60"></div>
+        <button class="btn" id="job-add">Schedule</button>
+        <span id="job-status" class="stat-sub" style="margin-left:12px"></span>
+      </div>
+      <div id="job-list"><p class="sub">Loading…</p></div>`;
+    loadJobs();
+    $("#job-add").addEventListener("click", async () => {
+      const prompt = $("#job-prompt").value.trim();
+      const st = $("#job-status");
+      if (!prompt) { st.textContent = "prompt required"; return; }
+      st.textContent = "scheduling…";
+      try {
+        await api("/jobs", { method: "POST", body: JSON.stringify({
+          prompt, interval_seconds: parseInt($("#job-interval").value) || 3600 }) });
+        st.textContent = "scheduled ✓";
+        $("#job-prompt").value = "";
+        loadJobs();
+      } catch (e) { st.textContent = `failed: ${e.message}`; }
+    });
+  }
+
+  async function loadJobs() {
+    const el = $("#job-list");
+    if (!state.live) { el.innerHTML = "<p class='sub'>Start dream serve for automations.</p>"; return; }
+    try {
+      const jobs = await api("/jobs");
+      if (!jobs.length) { el.innerHTML = "<p class='sub'>No jobs yet — schedule your first above.</p>"; return; }
+      el.innerHTML = jobs.map((j) => `
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+            <div>
+              <div style="font-weight:600">${esc(j.prompt)}</div>
+              <div class="stat-sub">every ${Math.round(j.interval_seconds / 60)}min ·
+                ${j.enabled ? "enabled" : "disabled"} · last run ${j.last_run ? new Date(j.last_run * 1000).toLocaleString() : "never"}</div>
+            </div>
+            <button class="btn outlined" data-jobdel="${esc(j.id)}">Delete</button>
+          </div>
+        </div>`).join("");
+      el.querySelectorAll("[data-jobdel]").forEach((b) => b.addEventListener("click", async () => {
+        await api("/jobs/" + b.dataset.jobdel, { method: "DELETE" });
+        loadJobs();
+      }));
+    } catch (e) { el.innerHTML = `<p class="sub">${esc(e.message)}</p>`; }
+  }
+
   // ---------- setup wizard ----------
   function renderSetup() {
     view.innerHTML = `
@@ -549,7 +682,7 @@ dream config --provider openai-compatible \\
   }
 
   // ---------- router ----------
-  const routes = { dashboard: renderDashboard, search: renderSearch, chat: renderChat, ask: renderAsk, setup: renderSetup, sources: renderSources, graph: renderGraph, settings: renderSettings };
+  const routes = { dashboard: renderDashboard, search: renderSearch, chat: renderChat, ask: renderAsk, jobs: renderJobs, setup: renderSetup, sources: renderSources, graph: renderGraph, settings: renderSettings };
   function route() {
     const name = (location.hash.replace("#/", "") || "dashboard").split("?")[0];
     document.querySelectorAll(".rail-item").forEach((a) =>
