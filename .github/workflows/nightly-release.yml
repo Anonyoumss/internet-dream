@@ -149,3 +149,6 @@ jobs:
           **Artifacts:** Android APK (release-signed debug), macOS DMG, Linux tarball/.deb/AppImage, browser extension ZIP.
           
           Download page: https://anonyoumss.github.io/internet-dream/downloads/"
+          # rolling 'nightly' prerelease for stable download URLs
+          gh release create nightly --prerelease --title "Nightly" --notes "Rolling nightly alpha — see dated releases for history." || true
+          gh release upload nightly relfiles/* --clobber
