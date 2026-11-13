@@ -24,7 +24,6 @@ jobs:
         run: |
           mkdir -p out
           cp mobile-flutter/build/app/outputs/flutter-apk/app-release.apk out/internet-dream-android.apk
-          cp -r downloads out/downloads-page 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         with: { name: apk, path: out/, retention-days: 30 }
 
@@ -109,8 +108,10 @@ jobs:
           AI=/tmp/squashfs-root/AppRun
           [ -x "$AI" ] || AI=/tmp/appimagetool
           ARCH=x86_64 "$AI" AppDir internet-dream-x86_64.AppImage
+          mkdir -p out
+          cp dist/internet-dream-linux-x86_64.tar.gz dist/internet-dream_0.1.0_amd64.deb dist/internet-dream-x86_64.AppImage out/
       - uses: actions/upload-artifact@v4
-        with: { name: linux, path: dist/, retention-days: 30 }
+        with: { name: linux, path: out/, retention-days: 30 }
 
   extension:
     runs-on: ubuntu-latest
@@ -139,8 +140,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           TAG="v0.1.0-alpha.$(date -u +%Y%m%d)-${{ github.run_number }}"
-          ls -la rel/
-          gh release create "$TAG" rel/* --prerelease --title "Nightly alpha $TAG" \
+          mkdir -p relfiles && find rel -type f -exec cp {} relfiles/ \;
+          ls -la relfiles/
+          gh release create "$TAG" relfiles/* --prerelease --title "Nightly alpha $TAG" \
             --notes "Automated nightly alpha build.
           
           **Artifacts:** Android APK (release-signed debug), macOS DMG, Linux tarball/.deb/AppImage, browser extension ZIP.
