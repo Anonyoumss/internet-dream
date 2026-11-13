@@ -15,6 +15,10 @@ jobs:
         with:
           channel: stable
           cache: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
       - name: Build debug APK
         working-directory: mobile-flutter
         run: flutter build apk --debug
