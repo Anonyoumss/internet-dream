@@ -1,0 +1,25 @@
+name: Flutter Android APK
+
+on:
+  push:
+    branches: [main]
+    paths: ["mobile-flutter/**", ".github/workflows/flutter-android.yml"]
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Build debug APK
+        working-directory: mobile-flutter
+        run: flutter build apk --debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: internet-dream-flutter-apk
+          path: mobile-flutter/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 30
