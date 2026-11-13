@@ -1,0 +1,163 @@
+name: Nightly alpha release
+
+on:
+  schedule:
+    - cron: "17 3 * * *"   # 03:17 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable, cache: true }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - name: Build APK
+        working-directory: mobile-flutter
+        run: flutter build apk --release
+      - name: Stage
+        run: |
+          mkdir -p out
+          cp mobile-flutter/build/app/outputs/flutter-apk/app-release.apk out/internet-dream-android.apk
+          cp -r downloads out/downloads-page 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        with: { name: apk, path: out/, retention-days: 30 }
+
+  dmg:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build app + DMG
+        working-directory: desktop-mac
+        run: |
+          swift build -c release 2>/dev/null || swift build
+          mkdir -p "Internet's Dream.app/Contents/MacOS"
+          cp .build/release/* "Internet's Dream.app/Contents/MacOS/" 2>/dev/null || true
+          cat > "Internet's Dream.app/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleName</key><string>Internet's Dream</string>
+            <key>CFBundleExecutable</key><string>InternetDream</string>
+            <key>CFBundleIdentifier</key><string>com.internetdream.app</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>0.1.0</string>
+          </dict></plist>
+          PLIST
+          hdiutil create -volname "Internet's Dream" -srcfolder "Internet's Dream.app" -ov -format UDZO "Internet's Dream.dmg"
+      - uses: actions/upload-artifact@v4
+        with: { name: dmg, path: "desktop-mac/Internet's Dream.dmg", retention-days: 30 }
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bundle tarball + deb + AppImage
+        run: |
+          mkdir -p dist/internet-dream-linux/{bin,lib/app,share/applications,share/icons/hicolor/512x512/apps}
+          cp -r desktop-linux/* dist/internet-dream-linux/bin/ 2>/dev/null || true
+          cp -r core dist/internet-dream-linux/lib/app/
+          cp INSTALL.md dist/internet-dream-linux/ 2>/dev/null || true
+          cp assets/store/icon-512.png dist/internet-dream-linux/share/icons/hicolor/512x512/apps/internet-dream.png
+          cat > dist/internet-dream-linux/bin/dream-desktop <<'RUN'
+          #!/usr/bin/env bash
+          DIR="$(cd "$(dirname "$0")/.." && pwd)"
+          exec python3 "$DIR/lib/app/desktop-linux/dream_desktop.py" "$@"
+          RUN
+          chmod +x dist/internet-dream-linux/bin/dream-desktop dist/internet-dream-linux/bin/run.sh 2>/dev/null || true
+          tar -czf dist/internet-dream-linux-x86_64.tar.gz -C dist internet-dream-linux
+
+          # --- .deb ---
+          mkdir -p dist/deb/DEBIAN dist/deb/opt/internet-dream dist/deb/usr/share/applications dist/deb/usr/bin
+          cp -r dist/internet-dream-linux/* dist/deb/opt/internet-dream/
+          cat > dist/deb/DEBIAN/control <<'CTRL'
+          Package: internet-dream
+          Version: 0.1.0
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Depends: python3, python3-pip
+          Maintainer: Anonyoumss
+          Description: Private encrypted second brain — local memory + AI agent
+          CTRL
+          cat > dist/deb/usr/share/applications/internet-dream.desktop <<'DESK'
+          [Desktop Entry]
+          Name=Internet's Dream
+          Exec=/opt/internet-dream/bin/dream-desktop
+          Icon=internet-dream
+          Type=Application
+          Categories=Utility;
+          DESK
+          cp assets/store/icon-512.png dist/deb/usr/share/icons/hicolor/512x512/apps/internet-dream.png 2>/dev/null || true
+          ln -sf /opt/internet-dream/bin/dream-desktop dist/deb/usr/bin/internet-dream
+          dpkg-deb --build dist/deb dist/internet-dream_0.1.0_amd64.deb
+
+          # --- AppImage ---
+          mkdir -p dist/AppDir/{usr/bin,usr/share/applications,usr/share/icons/hicolor/512x512/apps}
+          cp -r dist/internet-dream-linux/* dist/AppDir/usr/
+          cp assets/store/icon-512.png dist/AppDir/internet-dream.png
+          cat > dist/AppDir/AppRun <<'AR'
+          #!/usr/bin/env bash
+          HERE="$(dirname "$(readlink -f "$0")")"
+          exec python3 "$HERE/usr/bin/dream-desktop" "$@"
+          AR
+          # AppRun lives at AppDir root; desktop script path fix:
+          mv dist/AppDir/usr/bin/dream-desktop dist/AppDir/usr/bin/internet-dream-bin 2>/dev/null || true
+          cat > dist/AppDir/AppRun <<'AR'
+          #!/usr/bin/env bash
+          HERE="$(dirname "$(readlink -f "$0")")"
+          exec python3 "$HERE/usr/lib/app/desktop-linux/dream_desktop.py" "$@"
+          AR
+          cat > dist/AppDir/internet-dream.desktop <<'DESK'
+          [Desktop Entry]
+          Name=Internet's Dream
+          Exec=AppRun
+          Icon=internet-dream
+          Type=Application
+          Categories=Utility;
+          DESK
+          chmod +x dist/AppDir/AppRun
+          curl -sL -o /tmp/appimagetool "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x /tmp/appimagetool
+          cd dist && /tmp/appimagetool --appimage-extract >/dev/null 2>&1 || true
+          AI="/tmp/squashfs-root/AppRun"; [ -x "$AI" ] || AI=/tmp/appimagetool
+          ARCH=x86_64 "$AI" AppDir internet-dream-x86_64.AppImage -u
+      - uses: actions/upload-artifact@v4
+        with: { name: linux, path: dist/, retention-days: 30 }
+
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Package
+        run: |
+          mkdir -p out
+          cd extension && zip -r ../out/internet-dream-extension.zip . -x "*.DS_Store"
+      - uses: actions/upload-artifact@v4
+        with: { name: extension, path: out/, retention-days: 30 }
+
+  release:
+    needs: [apk, dmg, linux, extension]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { pattern: "*", merge-multiple: true, path: rel/ }
+      - name: Create nightly prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v0.1.0-alpha.$(date -u +%Y%m%d)-${{ github.run_number }}"
+          ls -la rel/
+          gh release create "$TAG" rel/* --prerelease --title "Nightly alpha $TAG" \
+            --notes "Automated nightly alpha build.
+          
+          **Artifacts:** Android APK (release-signed debug), macOS DMG, Linux tarball/.deb/AppImage, browser extension ZIP.
+          
+          Download page: https://anonyoumss.github.io/internet-dream/downloads/"
