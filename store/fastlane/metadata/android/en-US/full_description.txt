@@ -1,0 +1,9 @@
+Your life is scattered across 50 apps. Internet's Dream indexes them all —
+Gmail, Calendar, Drive, Discord, Telegram, WhatsApp, YouTube, browser
+history, files — into an AES-256-GCM encrypted local store, then puts an
+AI agent on top.
+
+Chat with your memories. Deep research. Scheduled automations. Voice.
+Vision. GDPR export/forget. Zero telemetry.
+
+Requires `dream serve` backend (self-hosted, localhost/LAN).

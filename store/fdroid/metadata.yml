@@ -1,0 +1,13 @@
+# F-Droid metadata draft — submit via gitlab.com/fdroid/fdroiddata
+# App: com.internetdream.internet_dream (Flutter debug→release build needed)
+Categories:
+  - Internet
+  - ScienceAndEducation
+License: UNLICENSED
+AuthorName: Anonyoumss
+WebSite: https://github.com/Anonyoumss/internet-dream
+SourceCode: https://github.com/Anonyoumss/internet-dream
+IssueTracker: https://github.com/Anonyoumss/internet-dream/issues
+Changelog: https://github.com/Anonyoumss/internet-dream/releases
+AntiFeatures:
+  - NonFreeNet  # optional LLM provider calls; core works offline
